@@ -29,11 +29,13 @@ export const BuyingGuidePage: React.FC = () => {
 
   // Recommended battery matching
   const matchedBattery =
-    requiredAh <= 160
-      ? products.find((p) => p.category === 'inverter' && p.capacityAh === 150) || products[5]
+    (requiredAh <= 160
+      ? products.find((p) => p.category === 'inverter' && p.capacityAh <= 160)
       : requiredAh <= 240
-      ? products.find((p) => p.category === 'inverter' && p.capacityAh === 220) || products[5]
-      : products.find((p) => p.category === 'lithium') || products[7];
+      ? products.find((p) => p.category === 'inverter' && p.capacityAh >= 200)
+      : products.find((p) => p.category === 'lithium')) ||
+    products.find((p) => p.category === 'inverter') ||
+    products[0];
 
   return (
     <div className="bg-[#17191C] min-h-screen py-16 border-b border-[#25282D]">

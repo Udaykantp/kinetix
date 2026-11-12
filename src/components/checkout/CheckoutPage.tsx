@@ -29,6 +29,7 @@ export const CheckoutPage: React.FC = () => {
     user,
     placeOrder,
     checkPincode,
+    showToast,
     navigate,
   } = useStore();
 
@@ -79,7 +80,7 @@ export const CheckoutPage: React.FC = () => {
   const handleProceedToPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !phone || !email || !addressLine1 || !pinCode) {
-      alert('Please fill all mandatory shipping fields.');
+      showToast('Please fill all mandatory shipping fields.', 'error');
       return;
     }
     setStep(3);

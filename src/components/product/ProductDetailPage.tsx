@@ -35,7 +35,7 @@ export const ProductDetailPage: React.FC = () => {
     navigate,
   } = useStore();
 
-  const productId = pageParams?.productId || products[0].id;
+  const productId = pageParams?.productId || (products[0] ? products[0].id : '');
   const product = products.find((p) => p.id === productId) || products[0];
 
   const [selectedImage, setSelectedImage] = useState(0);
@@ -105,12 +105,28 @@ export const ProductDetailPage: React.FC = () => {
     }
   };
 
+  if (!product) {
+    return (
+      <div className="bg-[#17191C] min-h-[60vh] flex flex-col items-center justify-center p-8 text-center">
+        <h2 className="text-xl font-bold text-[#F2F0EA]">Battery Model Not Found</h2>
+        <p className="text-xs text-[#8E959E] mt-2">The requested battery specification could not be located in our catalog.</p>
+        <button
+          onClick={() => navigate('shop')}
+          className="mt-6 px-6 py-2.5 bg-[#D6B98C] text-[#17191C] font-semibold text-xs rounded-lg"
+        >
+          Browse Catalog
+        </button>
+      </div>
+    );
+  }
+
   // Scrap exchange rebate (up to ₹1,200 discount)
   const scrapDiscount = exchangeScrap ? Math.min(1200, Math.round(product.price * 0.12)) : 0;
   const effectivePrice = product.price - scrapDiscount;
 
-  // Frequently bought together bundle
-  const accessory = products.find((p) => p.category === 'accessories') || products[10];
+  // Frequently bought together bundle (safe search)
+  const accessory = products.find((p) => p.category === 'accessories' && p.id !== product.id) ||
+    products.find((p) => p.id !== product.id);
 
   const handleBuyNow = () => {
     addToCart(product, quantity);
@@ -466,71 +482,73 @@ export const ProductDetailPage: React.FC = () => {
         )}
 
         {/* Frequently Bought Together Bundle */}
-        <div className="mt-12 bg-[#101214] border border-[#343940] rounded-2xl p-6 sm:p-8">
-          <div className="text-xs font-mono text-[#D6B98C] uppercase tracking-wider mb-1">
-            Engineered Bundle & Save
-          </div>
-          <h3 className="text-lg font-bold text-[#F2F0EA] mb-4">Frequently Bought Together</h3>
+        {accessory && (
+          <div className="mt-12 bg-[#101214] border border-[#343940] rounded-2xl p-6 sm:p-8">
+            <div className="text-xs font-mono text-[#D6B98C] uppercase tracking-wider mb-1">
+              Engineered Bundle & Save
+            </div>
+            <h3 className="text-lg font-bold text-[#F2F0EA] mb-4">Frequently Bought Together</h3>
 
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-3 bg-[#17191C] border border-[#25282D] p-3 rounded-xl">
-                <img
-                  src={product.images[0]}
-                  alt=""
-                  className="w-14 h-14 object-cover rounded bg-[#25282D]"
-                />
-                <div>
-                  <div className="text-xs font-semibold text-[#F2F0EA] line-clamp-1">
-                    {product.name}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-3 bg-[#17191C] border border-[#25282D] p-3 rounded-xl">
+                  <img
+                    src={product.images[0]}
+                    alt=""
+                    className="w-14 h-14 object-cover rounded bg-[#25282D]"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-[#F2F0EA] line-clamp-1">
+                      {product.name}
+                    </div>
+                    <div className="text-xs font-mono text-[#D6B98C]">
+                      ₹{product.price.toLocaleString('en-IN')}
+                    </div>
                   </div>
-                  <div className="text-xs font-mono text-[#D6B98C]">
-                    ₹{product.price.toLocaleString('en-IN')}
+                </div>
+
+                <span className="text-xl font-bold text-[#8E959E]">+</span>
+
+                <div className="flex items-center gap-3 bg-[#17191C] border border-[#25282D] p-3 rounded-xl">
+                  <img
+                    src={accessory.images[0]}
+                    alt=""
+                    className="w-14 h-14 object-cover rounded bg-[#25282D]"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-[#F2F0EA] line-clamp-1">
+                      {accessory.name}
+                    </div>
+                    <div className="text-xs font-mono text-[#D6B98C]">
+                      ₹{accessory.price.toLocaleString('en-IN')}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <span className="text-xl font-bold text-[#8E959E]">+</span>
-
-              <div className="flex items-center gap-3 bg-[#17191C] border border-[#25282D] p-3 rounded-xl">
-                <img
-                  src={accessory.images[0]}
-                  alt=""
-                  className="w-14 h-14 object-cover rounded bg-[#25282D]"
-                />
+              <div className="text-right flex items-center gap-4">
                 <div>
-                  <div className="text-xs font-semibold text-[#F2F0EA] line-clamp-1">
-                    {accessory.name}
+                  <div className="text-base font-bold text-[#F2F0EA] font-mono tabular-nums">
+                    ₹{(product.price + accessory.price - 500).toLocaleString('en-IN')}
                   </div>
-                  <div className="text-xs font-mono text-[#D6B98C]">
-                    ₹{accessory.price.toLocaleString('en-IN')}
+                  <div className="text-xs text-[#8E959E]">
+                    Combo Discount: Save ₹500
                   </div>
                 </div>
+                <button
+                  onClick={() => {
+                    addToCart(product);
+                    addToCart(accessory);
+                    showToast('Bundle added to cart with combo discount!');
+                  }}
+                  className="px-4 py-2.5 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-semibold text-xs rounded-lg transition-colors"
+                >
+                  Buy Both Together
+                </button>
               </div>
             </div>
-
-            <div className="text-right flex items-center gap-4">
-              <div>
-                <div className="text-base font-bold text-[#F2F0EA] font-mono tabular-nums">
-                  ₹{(product.price + accessory.price - 500).toLocaleString('en-IN')}
-                </div>
-                <div className="text-xs text-[#8E959E]">
-                  Combo Discount: Save ₹500
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  addToCart(product);
-                  addToCart(accessory);
-                  showToast('Bundle added to cart with combo discount!');
-                }}
-                className="px-4 py-2.5 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-semibold text-xs rounded-lg transition-colors"
-              >
-                Buy Both Together
-              </button>
-            </div>
           </div>
-        </div>
+        )}
 
         {/* Customer Reviews & Add Review Form */}
         <div className="mt-16 bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8">

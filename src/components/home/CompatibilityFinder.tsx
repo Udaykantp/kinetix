@@ -34,9 +34,11 @@ export const CompatibilityFinder: React.FC = () => {
 
   // Find matching inverter battery
   const matchedInverterBattery =
-    selectedHomeType === '3BHK' || backupHours === '6'
-      ? products.find((p) => p.category === 'inverter' && p.capacityAh >= 200) || products[5]
-      : products.find((p) => p.category === 'inverter' && p.capacityAh >= 150) || products[6];
+    (selectedHomeType === '3BHK' || backupHours === '6'
+      ? products.find((p) => p.category === 'inverter' && p.capacityAh >= 200)
+      : products.find((p) => p.category === 'inverter' && p.capacityAh >= 150)) ||
+    products.find((p) => p.category === 'inverter') ||
+    products[0];
 
   return (
     <section id="compatibility-finder" className="py-16 bg-[#17191C] border-b border-[#25282D]">

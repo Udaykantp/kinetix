@@ -13,7 +13,7 @@ import { useStore } from '../../context/StoreContext';
 import { OrderStatus } from '../../types';
 
 export const OrderTrackingPage: React.FC = () => {
-  const { getOrderById, orders, pageParams } = useStore();
+  const { getOrderById, orders, pageParams, showToast } = useStore();
   const [searchId, setSearchId] = useState(pageParams?.orderId || orders[0]?.id || 'KTX-89214');
   const [activeOrder, setActiveOrder] = useState(() => getOrderById(searchId) || orders[0]);
 
@@ -24,7 +24,7 @@ export const OrderTrackingPage: React.FC = () => {
       if (found) {
         setActiveOrder(found);
       } else {
-        alert('Order ID not found in tracking registry. Try KTX-89214 or KTX-94812.');
+        showToast('Order ID not found in tracking registry. Try KTX-89214 or KTX-94812.', 'error');
       }
     }
   };

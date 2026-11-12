@@ -301,14 +301,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem('kinetix_cart');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed.filter((item) => item && item.product && item.product.id);
+          if (valid.length > 0) return valid;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
-    return [
-      { product: INITIAL_PRODUCTS[0], quantity: 1 },
-      { product: INITIAL_PRODUCTS[11], quantity: 1 },
-    ];
+    const safeCart: CartItem[] = [];
+    if (INITIAL_PRODUCTS[0]) safeCart.push({ product: INITIAL_PRODUCTS[0], quantity: 1 });
+    if (INITIAL_PRODUCTS[15]) safeCart.push({ product: INITIAL_PRODUCTS[15], quantity: 1 });
+    return safeCart;
   });
 
   useEffect(() => {
@@ -322,11 +328,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [wishlist, setWishlist] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('kinetix_wishlist');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter((p) => p && p.id);
+          if (valid.length > 0) return valid;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
-    return [INITIAL_PRODUCTS[5], INITIAL_PRODUCTS[7]];
+    return INITIAL_PRODUCTS.slice(5, 7);
   });
 
   useEffect(() => {
@@ -334,10 +346,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [wishlist]);
 
   // Comparison
-  const [comparisonList, setComparisonList] = useState<Product[]>([
-    INITIAL_PRODUCTS[0],
-    INITIAL_PRODUCTS[1],
-  ]);
+  const [comparisonList, setComparisonList] = useState<Product[]>(() => {
+    return INITIAL_PRODUCTS.slice(0, 2);
+  });
 
   // User
   const [user, setUser] = useState<User | null>(() => {
@@ -362,7 +373,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const saved = localStorage.getItem('kinetix_orders');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch (e) {
       console.error(e);
     }
