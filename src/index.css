@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-graphite-950: #0F1012;
+  --color-graphite-900: #17191C;
+  --color-graphite-800: #25282D;
+  --color-graphite-700: #343940;
+  --color-graphite-600: #4B525C;
+  
+  --color-titanium-50: #F7F8F9;
+  --color-titanium-100: #ECEEF0;
+  --color-titanium-200: #D8DBDF;
+  --color-titanium-300: #B7BCC2;
+  --color-titanium-400: #8E959E;
+  --color-titanium-500: #6B727D;
+
+  --color-champagne-light: #F4EAD9;
+  --color-champagne: #D6B98C;
+  --color-champagne-dark: #B59562;
+  --color-champagne-hover: #E3CDA7;
+
+  --color-copper-light: #C9906E;
+  --color-copper: #A87555;
+  --color-copper-dark: #7F5338;
+
+  --color-ivory-50: #FAF9F6;
+  --color-ivory: #F2F0EA;
+  --color-ivory-dark: #E4E0D5;
+
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #17191C;
+  color: #F2F0EA;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar for industrial aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #17191C;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #343940;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B7BCC2;
+}
+
+/* Metallic gradient utility */
+.metallic-surface {
+  background: linear-gradient(135deg, rgba(183, 188, 194, 0.08) 0%, rgba(37, 40, 45, 0.6) 100%);
+  border: 1px solid rgba(183, 188, 194, 0.15);
+}
+
+.champagne-glow {
+  box-shadow: 0 0 25px rgba(214, 185, 140, 0.15);
+}
+
+.copper-border {
+  border-color: rgba(168, 117, 85, 0.35);
+}
