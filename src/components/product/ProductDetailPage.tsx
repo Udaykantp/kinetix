@@ -1,49 +1,105 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
 import {
-  Star,
-  ShieldCheck,
-  Truck,
-  RotateCcw,
-  Check,
-  Plus,
-  Minus,
-  ShoppingBag,
-  Zap,
-  Heart,
-  GitCompare,
   ArrowRight,
+  ArrowUpRight,
+  Check,
   Maximize2,
-  MapPin,
-  Clock,
-  Sparkles,
-  HelpCircle,
+  ShoppingBag,
+  Star,
+  X,
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { Product } from '../../types';
+import { PdpHeader } from './pdp/PdpHeader';
+import { TopographicShaderCanvas } from './pdp/TopographicShaderCanvas';
+import { PinnedShowcase } from './pdp/PinnedShowcase';
+import { ThermalComparison } from './pdp/ThermalComparison';
+import { CraftBento } from './pdp/CraftBento';
+import { ProductConfigurator } from './pdp/ProductConfigurator';
+import { ProductReviewsSection } from './pdp/ProductReviewsSection';
+import {
+  buildCapacityOptions,
+  buildShowcaseStages,
+  FINISH_OPTIONS,
+  FinishId,
+  PdpTheme,
+} from './pdp/pdpConfig';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export const ProductDetailPage: React.FC = () => {
   const {
     pageParams,
     products,
     addToCart,
+    cartItemCount,
+    setIsCartOpen,
     toggleWishlist,
     isInWishlist,
     addToComparison,
     isInComparison,
     checkPincode,
-    showToast,
     navigate,
   } = useStore();
 
   const productId = pageParams?.productId || (products[0] ? products[0].id : '');
   const product = products.find((p) => p.id === productId) || products[0];
 
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [zoomOpen, setZoomOpen] = useState(false);
+  // Light Mode default with Dark Mode toggle
+  const [theme, setTheme] = useState<PdpTheme>('light');
+  const [selectedFinishId, setSelectedFinishId] = useState<FinishId>(() => {
+    const paramFinish = pageParams?.finish as FinishId | undefined;
+    return FINISH_OPTIONS.some((f) => f.id === paramFinish)
+      ? (paramFinish as FinishId)
+      : 'alpine-sage';
+  });
   const [quantity, setQuantity] = useState(1);
   const [exchangeScrap, setExchangeScrap] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
 
-  // Pincode state
+  // Reduced motion preference
+  const [reducedMotion, setReducedMotion] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Derived capacity options & showcase stages
+  const capacityOptions = useMemo(() => buildCapacityOptions(product), [product]);
+  const [selectedCapacityId, setSelectedCapacityId] = useState<string>(
+    () => (typeof pageParams?.capacity === 'string' && pageParams.capacity) || 'standard'
+  );
+
+  const selectedCapacity = useMemo(
+    () => capacityOptions.find((c) => c.id === selectedCapacityId) || capacityOptions[1] || capacityOptions[0],
+    [capacityOptions, selectedCapacityId]
+  );
+
+  const selectedFinish = useMemo(
+    () => FINISH_OPTIONS.find((f) => f.id === selectedFinishId) || FINISH_OPTIONS[0],
+    [selectedFinishId]
+  );
+
+  // Reflect non-default variant selections in the shareable deep-link URL
+  useEffect(() => {
+    if (!product?.id) return;
+    const nextParams: Record<string, any> = { productId: product.id };
+    if (selectedFinishId !== 'alpine-sage') nextParams.finish = selectedFinishId;
+    if (selectedCapacityId !== 'standard') nextParams.capacity = selectedCapacityId;
+    navigate('product-detail', nextParams, { replace: true, skipScroll: true });
+  }, [product?.id, selectedFinishId, selectedCapacityId]);
+
+  const showcaseStages = useMemo(() => buildShowcaseStages(product), [product]);
+
+  // Pincode serviceability
   const [pincode, setPincode] = useState('400050');
   const [pinResult, setPinResult] = useState<{
     deliverable: boolean;
@@ -53,603 +109,747 @@ export const ProductDetailPage: React.FC = () => {
     expressAvailable: boolean;
   } | null>(() => checkPincode('400050'));
 
-  // Review form state
-  const [newReviewAuthor, setNewReviewAuthor] = useState('');
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewComment, setNewReviewComment] = useState('');
-  const [reviewsList, setReviewsList] = useState([
-    {
-      id: 'rev-1',
-      author: 'Sameer Verma',
-      rating: 5,
-      date: 'March 04, 2026',
-      title: 'Unbelievable cranking power in extreme morning cold',
-      comment:
-        'Installed in my Hyundai Creta Diesel. The cranking sound is instantaneous. The technician arrived in Bandra with a digital CCA meter and verified charging before bolting down.',
-      vehicle: 'Hyundai Creta 1.5 Diesel',
-    },
-    {
-      id: 'rev-2',
-      author: 'Rohit Khandelwal',
-      rating: 5,
-      date: 'February 19, 2026',
-      title: 'Flawless build quality and premium terminals',
-      comment:
-        'The dark graphite casing and titanium top plate look exceptionally high-end. Zero acid smell and voltage holds steady at 12.8V.',
-      vehicle: 'Kia Seltos GT Line',
-    },
-  ]);
+  // Live star-rating summary synced from ProductReviewsSection
+  const [reviewStats, setReviewStats] = useState<{
+    averageRating: number;
+    totalCount: number;
+  }>({
+    averageRating: product?.rating ?? 4.8,
+    totalCount: product?.reviewCount ?? 0,
+  });
 
-  const handlePincodeCheck = (e: React.FormEvent) => {
-    e.preventDefault();
-    const res = checkPincode(pincode);
-    setPinResult(res);
-  };
+  const handleReviewStatsChange = useCallback(
+    (next: { averageRating: number; totalCount: number }) => {
+      setReviewStats((prev) =>
+        prev.averageRating === next.averageRating && prev.totalCount === next.totalCount
+          ? prev
+          : next
+      );
+    },
+    []
+  );
 
-  const handleAddReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newReviewAuthor.trim() && newReviewComment.trim()) {
-      const review = {
-        id: `rev-${Date.now()}`,
-        author: newReviewAuthor.trim(),
-        rating: newReviewRating,
-        date: 'Today',
-        title: 'Verified Customer Experience',
-        comment: newReviewComment.trim(),
-        vehicle: 'Verified Purchaser',
-      };
-      setReviewsList([review, ...reviewsList]);
-      setNewReviewAuthor('');
-      setNewReviewComment('');
-      showToast('Thank you! Your verified technical review has been posted.');
+  // Pricing & scrap rebate
+  const scrapDiscount = product.category === 'accessories' ? 0 : 1200;
+  const effectivePrice = Math.max(
+    500,
+    selectedCapacity.price - (exchangeScrap ? scrapDiscount : 0)
+  );
+
+  // Lenis smooth scrolling synchronized with GSAP ticker
+  const lenisRef = useRef<Lenis | null>(null);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      lenisRef.current = null;
+      return;
     }
+
+    const lenis = new Lenis({
+      duration: 1.12,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+      touchMultiplier: 1.4,
+    });
+
+    lenisRef.current = lenis;
+    lenis.on('scroll', ScrollTrigger.update);
+
+    const tick = (time: number) => {
+      lenis.raf(time * 1000);
+    };
+
+    gsap.ticker.add(tick);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      gsap.ticker.remove(tick);
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, [reducedMotion]);
+
+  // Reset state & scroll position when switching products
+  useEffect(() => {
+    setSelectedFinishId('alpine-sage');
+    setSelectedCapacityId('standard');
+    setQuantity(1);
+    setExchangeScrap(false);
+    setZoomOpen(false);
+
+    if (lenisRef.current) {
+      lenisRef.current.scrollTo(0, { immediate: true });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    const timer = window.setTimeout(() => {
+      ScrollTrigger.refresh();
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [product.id]);
+
+  // Close zoom lightbox on Escape
+  useEffect(() => {
+    if (!zoomOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setZoomOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [zoomOpen]);
+
+  const scrollToSection = useCallback(
+    (id: string) => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      if (lenisRef.current && !reducedMotion) {
+        lenisRef.current.scrollTo(target, { offset: -64, duration: 1.1 });
+      } else {
+        target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+      }
+    },
+    [reducedMotion]
+  );
+
+  // Spring-damped 3D pointer-tracking perspective tilt for Hero product showcase
+  const heroStageRef = useRef<HTMLDivElement | null>(null);
+  const heroCardRef = useRef<HTMLDivElement | null>(null);
+  const heroShadowRef = useRef<HTMLDivElement | null>(null);
+  const tiltTargetRef = useRef({ rx: 0, ry: 0, tx: 0, ty: 0 });
+  const tiltCurrentRef = useRef({ rx: 0, ry: 0, tx: 0, ty: 0 });
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    let rafId = 0;
+
+    const animateTilt = () => {
+      const c = tiltCurrentRef.current;
+      const t = tiltTargetRef.current;
+      const ease = 0.085;
+
+      c.rx += (t.rx - c.rx) * ease;
+      c.ry += (t.ry - c.ry) * ease;
+      c.tx += (t.tx - c.tx) * ease;
+      c.ty += (t.ty - c.ty) * ease;
+
+      if (heroCardRef.current) {
+        heroCardRef.current.style.transform = `perspective(1100px) rotateX(${c.rx.toFixed(2)}deg) rotateY(${c.ry.toFixed(2)}deg) translate3d(${c.tx.toFixed(2)}px, ${c.ty.toFixed(2)}px, 0)`;
+      }
+      if (heroShadowRef.current) {
+        heroShadowRef.current.style.transform = `translate3d(${(-c.ry * 2.4).toFixed(2)}px, ${(c.rx * 1.4).toFixed(2)}px, 0) scale(${(1 - Math.abs(c.rx) * 0.004).toFixed(3)})`;
+      }
+
+      rafId = requestAnimationFrame(animateTilt);
+    };
+
+    rafId = requestAnimationFrame(animateTilt);
+    return () => cancelAnimationFrame(rafId);
+  }, [reducedMotion]);
+
+  const handleStagePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (reducedMotion || !heroStageRef.current) return;
+    const rect = heroStageRef.current.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    tiltTargetRef.current = {
+      rx: -ny * 9.5,
+      ry: nx * 11.5,
+      tx: nx * 8,
+      ty: ny * 6,
+    };
   };
 
-  if (!product) {
-    return (
-      <div className="bg-[#17191C] min-h-[60vh] flex flex-col items-center justify-center p-8 text-center">
-        <h2 className="text-xl font-bold text-[#F2F0EA]">Battery Model Not Found</h2>
-        <p className="text-xs text-[#8E959E] mt-2">The requested battery specification could not be located in our catalog.</p>
-        <button
-          onClick={() => navigate('shop')}
-          className="mt-6 px-6 py-2.5 bg-[#D6B98C] text-[#17191C] font-semibold text-xs rounded-lg"
-        >
-          Browse Catalog
-        </button>
-      </div>
-    );
-  }
+  const handleStagePointerLeave = () => {
+    tiltTargetRef.current = { rx: 0, ry: 0, tx: 0, ty: 0 };
+  };
 
-  // Scrap exchange rebate (up to ₹1,200 discount)
-  const scrapDiscount = exchangeScrap ? Math.min(1200, Math.round(product.price * 0.12)) : 0;
-  const effectivePrice = product.price - scrapDiscount;
-
-  // Frequently bought together bundle (safe search)
-  const accessory = products.find((p) => p.category === 'accessories' && p.id !== product.id) ||
-    products.find((p) => p.id !== product.id);
+  // Cart / Action handlers
+  const handleAddToCart = () => {
+    addToCart(product, quantity, {
+      finishName: selectedFinish.name,
+      finishFilter: selectedFinish.filter,
+      capacityLabel: selectedCapacity.label,
+      unitPrice: effectivePrice,
+    });
+    setIsCartOpen(true);
+  };
 
   const handleBuyNow = () => {
-    addToCart(product, quantity);
+    addToCart(product, quantity, {
+      finishName: selectedFinish.name,
+      finishFilter: selectedFinish.filter,
+      capacityLabel: selectedCapacity.label,
+      unitPrice: effectivePrice,
+    });
     navigate('checkout');
   };
 
-  return (
-    <div className="bg-[#17191C] min-h-screen py-10 border-b border-[#25282D]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-[#8E959E] font-mono mb-8">
-          <button onClick={() => navigate('home')} className="hover:text-[#F2F0EA]">
-            Home
-          </button>
-          <span>/</span>
-          <button onClick={() => navigate('shop')} className="hover:text-[#F2F0EA]">
-            Batteries
-          </button>
-          <span>/</span>
-          <button
-            onClick={() => navigate('category', { category: product.category })}
-            className="hover:text-[#F2F0EA] capitalize"
-          >
-            {product.category}
-          </button>
-          <span>/</span>
-          <span className="text-[#D6B98C] truncate max-w-xs">{product.name}</span>
-        </div>
+  const handlePincodeCheck = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinResult(checkPincode(pincode));
+  };
 
-        {/* Contiguous PDP Grid: Left Gallery + Right Purchase Module */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-          {/* LEFT: Image Gallery & Zoom */}
-          <div className="lg:col-span-6 space-y-4">
-            <div className="relative aspect-[4/3] bg-[#101214] border border-[#25282D] rounded-2xl overflow-hidden group">
-              <img
-                src={product.images[selectedImage] || product.images[0]}
-                alt={product.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover cursor-zoom-in transition-transform duration-300 group-hover:scale-105"
-                onClick={() => setZoomOpen(true)}
+  const relatedProducts = useMemo(() => {
+    const sameCat = products.filter(
+      (p) => p.category === product.category && p.id !== product.id
+    );
+    if (sameCat.length >= 3) return sameCat.slice(0, 3);
+    const others = products.filter(
+      (p) => p.id !== product.id && !sameCat.some((s) => s.id === p.id)
+    );
+    return [...sameCat, ...others].slice(0, 3);
+  }, [products, product]);
+
+  const inWishlist = isInWishlist(product.id);
+  const inComparison = isInComparison(product.id);
+
+  if (!product) return null;
+
+  return (
+    <div
+      className="pdp-root min-h-screen relative transition-colors duration-300"
+      data-theme={theme}
+    >
+      {/* Subtle fixed film-grain texture */}
+      <div className="pdp-film-grain" aria-hidden="true" />
+
+      {/* Fixed 64px Frosted-Glass Header */}
+      <PdpHeader
+        theme={theme}
+        onToggleTheme={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+        cartItemCount={cartItemCount}
+        onOpenCart={() => setIsCartOpen(true)}
+        onBackToCatalog={() => navigate('shop')}
+        onScrollToSection={scrollToSection}
+      />
+
+      {/* =========================================================
+          SECTION 1: ASYMMETRIC SPLIT HERO (#hero, min-height: 100dvh)
+          ========================================================= */}
+      <section
+        id="hero"
+        className="relative min-h-[100dvh] w-full flex items-center overflow-hidden pt-20 pb-14 sm:pt-24 sm:pb-16"
+      >
+        {/* Full-bleed WebGL2 Topographic Contour Shader */}
+        <TopographicShaderCanvas theme={theme} reducedMotion={reducedMotion} />
+
+        {/* Soft bottom transition fade into next section */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[var(--pdp-bg)] to-transparent"
+        />
+
+        <div className="relative z-10 w-full max-w-[1240px] mx-auto px-5 sm:px-8 grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-16 items-center">
+          {/* Left Column: Editorial Headline, Copy & Pill CTAs */}
+          <div className="space-y-6 sm:space-y-7 max-w-xl">
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[var(--pdp-glass)] backdrop-blur-md border border-[var(--pdp-border)]">
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: selectedFinish.swatch }}
               />
-              <button
-                onClick={() => setZoomOpen(true)}
-                className="absolute top-4 right-4 p-2 bg-[#17191C]/80 backdrop-blur-md text-[#B7BCC2] hover:text-[#F2F0EA] rounded-lg border border-[#343940] transition-colors"
-                aria-label="Enlarge image"
+              <span className="pdp-mono text-[11px] uppercase tracking-[0.14em] text-[var(--pdp-text-muted)]">
+                {product.brand} · {product.technology}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <h1
+                className="pdp-heading font-bold text-[var(--pdp-text)] leading-[0.98]"
+                style={{ fontSize: 'clamp(2.75rem, 6vw, 5.1rem)' }}
               >
-                <Maximize2 className="w-4 h-4" />
+                Built for altitude.
+              </h1>
+              <p className="pdp-heading text-lg sm:text-xl font-medium text-[var(--pdp-text-muted)] tracking-[-0.02em]">
+                {product.name}
+              </p>
+            </div>
+
+            <p className="text-[15px] sm:text-base text-[var(--pdp-text-muted)] leading-relaxed max-w-lg">
+              {product.description} Engineered for sub-zero mountain starts, zero terminal
+              condensation, and relentless cycle endurance across every terrain.
+            </p>
+
+            {/* Quick Monospace Telemetry Strip */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-xs pdp-mono text-[var(--pdp-text-muted)]">
+              <span className="text-base sm:text-lg font-medium text-[var(--pdp-text)]">
+                ₹{effectivePrice.toLocaleString('en-IN')}
+              </span>
+              <span aria-hidden="true" className="opacity-35">
+                /
+              </span>
+              <span>{product.voltage}</span>
+              <span aria-hidden="true" className="opacity-35">
+                /
+              </span>
+              <span>{selectedCapacity.label}</span>
+              <span aria-hidden="true" className="opacity-35">
+                /
+              </span>
+              <span>{product.warrantyMonths}M Warranty</span>
+              <span aria-hidden="true" className="opacity-35">
+                /
+              </span>
+              <button
+                type="button"
+                onClick={() => scrollToSection('reviews')}
+                className="inline-flex items-center gap-1.5 text-[var(--pdp-text)] hover:text-[var(--pdp-accent)] transition-colors underline-offset-4 hover:underline"
+                aria-label={`Jump to ${reviewStats.totalCount} customer reviews`}
+              >
+                <Star className="w-3.5 h-3.5 fill-current text-[#D6A546]" />
+                <span className="font-medium">{reviewStats.averageRating.toFixed(1)}</span>
+                <span className="text-[var(--pdp-text-muted)]">
+                  ({reviewStats.totalCount} {reviewStats.totalCount === 1 ? 'review' : 'reviews'})
+                </span>
+              </button>
+            </div>
+
+            {/* Dual Pill CTAs */}
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => scrollToSection('order')}
+                className="pdp-btn w-full sm:w-auto h-12 px-7 text-sm font-medium bg-[var(--pdp-accent)] hover:bg-[var(--pdp-accent-hover)] text-[#f3f6f4] shadow-lg shadow-black/10 inline-flex items-center justify-center gap-2"
+              >
+                <span>Shop {product.brand}</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
 
-              <div className="absolute bottom-4 left-4 bg-[#17191C]/90 text-[10px] font-mono text-[#D6B98C] px-2.5 py-1 rounded border border-[#D6B98C]/30">
-                100% FACTORY FRESH · DIRECT WARRANTY
+              <button
+                type="button"
+                onClick={() => scrollToSection('showcase')}
+                className="pdp-btn w-full sm:w-auto h-12 px-6 text-sm font-medium bg-[var(--pdp-glass)] hover:bg-[var(--pdp-glass-strong)] backdrop-blur-md border border-[var(--pdp-border-strong)] text-[var(--pdp-text)] inline-flex items-center justify-center gap-1.5"
+              >
+                <span>Explore</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Floating 3D Pointer-Tilting Hardware Stage + Interactive Finish Swatches */}
+          <div className="flex flex-col items-center">
+            <div
+              ref={heroStageRef}
+              onPointerMove={handleStagePointerMove}
+              onPointerLeave={handleStagePointerLeave}
+              className="relative w-full max-w-[460px] aspect-square flex items-center justify-center select-none"
+            >
+              {/* Soft Ambient Aura behind product */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-10 rounded-full opacity-55 blur-3xl transition-colors duration-500"
+                style={{
+                  background: `radial-gradient(circle, ${selectedFinish.swatch}44 0%, transparent 72%)`,
+                }}
+              />
+
+              {/* Synchronized Shifting Drop Shadow */}
+              <div
+                ref={heroShadowRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute bottom-7 w-[68%] h-10 rounded-full blur-2xl will-change-transform"
+                style={{
+                  background:
+                    theme === 'dark'
+                      ? 'rgba(0, 0, 0, 0.72)'
+                      : 'rgba(17, 22, 20, 0.24)',
+                }}
+              />
+
+              {/* 3D Tilted Floating Product Frame */}
+              <div
+                ref={heroCardRef}
+                onClick={() => setZoomOpen(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setZoomOpen(true);
+                  }
+                }}
+                aria-label="Inspect product in full-screen zoom"
+                className="relative z-10 w-[84%] h-[84%] rounded-[12px] p-4 sm:p-6 flex items-center justify-center cursor-zoom-in will-change-transform group"
+              >
+                <img
+                  src={product.images[0]}
+                  alt={`${product.name} in ${selectedFinish.name}`}
+                  style={{ filter: selectedFinish.filter }}
+                  className="w-full h-full object-contain rounded-[12px] drop-shadow-[0_24px_38px_rgba(17,22,20,0.22)] transition-[filter] duration-500"
+                />
+                <span className="pdp-mono text-[10px] uppercase tracking-[0.14em] px-2.5 py-1 rounded-full bg-[var(--pdp-glass-strong)] backdrop-blur-md border border-[var(--pdp-border)] text-[var(--pdp-text-muted)] absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1">
+                  <Maximize2 className="w-3 h-3" />
+                  Zoom
+                </span>
               </div>
             </div>
 
-            {/* Thumbnail selector */}
-            {product.images.length > 1 && (
-              <div className="flex items-center gap-3">
-                {product.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedImage(idx)}
-                    className={`w-20 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === idx
-                        ? 'border-[#D6B98C]'
-                        : 'border-[#25282D] opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
+            {/* Interactive Glassmorphic Finish Swatches Pill Radio Group */}
+            <div className="mt-3 w-full flex flex-col items-center gap-2.5">
+              <div
+                role="radiogroup"
+                aria-label="Select enclosure finish"
+                className="pdp-glass-pill !rounded-2xl sm:!rounded-full p-1.5 inline-flex flex-wrap justify-center max-w-full items-center gap-1 shadow-sm"
+              >
+                {FINISH_OPTIONS.map((finish) => {
+                  const active = finish.id === selectedFinish.id;
+                  return (
+                    <button
+                      key={finish.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setSelectedFinishId(finish.id)}
+                      className={`pdp-btn inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 text-[11px] sm:text-xs font-medium transition-all ${
+                        active
+                          ? 'bg-[var(--pdp-surface-2)] text-[var(--pdp-text)] shadow-sm'
+                          : 'text-[var(--pdp-text-muted)] hover:text-[var(--pdp-text)]'
+                      }`}
+                    >
+                      <span
+                        className={`w-3.5 h-3.5 rounded-full border shrink-0 ${
+                          active
+                            ? 'ring-2 ring-offset-2 ring-[var(--pdp-accent)] ring-offset-[var(--pdp-surface-2)] border-black/15'
+                            : 'border-black/20'
+                        }`}
+                        style={{ backgroundColor: finish.swatch }}
+                      />
+                      <span className="whitespace-nowrap">{finish.name}</span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
+              <p className="pdp-mono text-[11px] text-[var(--pdp-text-muted)] text-center px-2">
+                {selectedFinish.tagline}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Highlights bullet list */}
-            <div className="bg-[#101214] border border-[#25282D] rounded-xl p-5 mt-6">
-              <h4 className="text-xs font-mono uppercase tracking-wider text-[#D6B98C] mb-3">
+      {/* =========================================================
+          SECTION 2: PINNED 4-STAGE ENVIRONMENTAL SHOWCASE (#showcase)
+          ========================================================= */}
+      <PinnedShowcase
+        key={`showcase-${product.id}`}
+        stages={showcaseStages}
+        reducedMotion={reducedMotion}
+      />
+
+      {/* =========================================================
+          SECTION 3: INTERACTIVE THERMAL COMPARISON (#thermal)
+          ========================================================= */}
+      <ThermalComparison product={product} reducedMotion={reducedMotion} />
+
+      {/* =========================================================
+          SECTION 4: EDITORIAL CRAFT BENTO (#craft)
+          ========================================================= */}
+      <CraftBento
+        key={`craft-${product.id}`}
+        product={product}
+        theme={theme}
+        reducedMotion={reducedMotion}
+      />
+
+      {/* =========================================================
+          SECTION 5: INTERACTIVE FINISH & CAPACITY CONFIGURATOR (#order)
+          ========================================================= */}
+      <ProductConfigurator
+        product={product}
+        selectedFinish={selectedFinish}
+        onSelectFinish={setSelectedFinishId}
+        capacityOptions={capacityOptions}
+        selectedCapacity={selectedCapacity}
+        onSelectCapacity={(opt) => setSelectedCapacityId(opt.id)}
+        quantity={quantity}
+        onQuantityChange={setQuantity}
+        exchangeScrap={exchangeScrap}
+        onToggleScrap={setExchangeScrap}
+        effectivePrice={effectivePrice}
+        scrapDiscount={scrapDiscount}
+        inWishlist={inWishlist}
+        inComparison={inComparison}
+        onToggleWishlist={() => toggleWishlist(product)}
+        onAddToComparison={() => addToComparison(product)}
+        onAddToCart={handleAddToCart}
+        onBuyNow={handleBuyNow}
+        onOpenZoom={() => setZoomOpen(true)}
+        pincode={pincode}
+        onPincodeChange={setPincode}
+        onCheckPincode={handlePincodeCheck}
+        pinResult={pinResult}
+      />
+
+      {/* =========================================================
+          SECTION 6: TECHNICAL SPECIFICATIONS, COMPATIBILITY & REVIEWS (#specs)
+          ========================================================= */}
+      <section
+        id="specs"
+        aria-labelledby="specs-heading"
+        className="py-20 sm:py-24 px-5 sm:px-8 max-w-[1240px] mx-auto border-t border-[var(--pdp-border)] space-y-16"
+      >
+        {/* Technical Dossier & Compatibility Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+          <div className="lg:col-span-7 space-y-6">
+            <div className="space-y-2">
+              <p className="pdp-mono text-xs uppercase tracking-[0.14em] text-[var(--pdp-accent)]">
+                05 / Technical Dossier
+              </p>
+              <h2
+                id="specs-heading"
+                className="pdp-heading text-3xl sm:text-4xl font-bold text-[var(--pdp-text)]"
+              >
+                Verified specifications.
+              </h2>
+            </div>
+
+            <div className="rounded-[12px] border border-[var(--pdp-border)] bg-[var(--pdp-surface)] overflow-hidden divide-y divide-[var(--pdp-border)]">
+              <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-4 text-xs sm:text-sm">
+                <span className="text-[var(--pdp-text-muted)] shrink-0">Voltage Architecture</span>
+                <span className="pdp-mono font-medium text-[var(--pdp-text)] text-right">
+                  {product.voltage}
+                </span>
+              </div>
+              <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-4 text-xs sm:text-sm">
+                <span className="text-[var(--pdp-text-muted)] shrink-0">Configured Capacity</span>
+                <span className="pdp-mono font-medium text-[var(--pdp-text)] text-right">
+                  {selectedCapacity.label}
+                </span>
+              </div>
+              <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-4 text-xs sm:text-sm">
+                <span className="text-[var(--pdp-text-muted)] shrink-0">Chemistry</span>
+                <span className="pdp-mono font-medium text-[var(--pdp-text)] text-right">
+                  {product.technology}
+                </span>
+              </div>
+              <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-4 text-xs sm:text-sm">
+                <span className="text-[var(--pdp-text-muted)] shrink-0">Enclosure Dimensions</span>
+                <span className="pdp-mono font-medium text-[var(--pdp-text)] text-right">
+                  {product.dimensions}
+                </span>
+              </div>
+              <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-4 text-xs sm:text-sm">
+                <span className="text-[var(--pdp-text-muted)] shrink-0">Net Mass</span>
+                <span className="pdp-mono font-medium text-[var(--pdp-text)] text-right">
+                  {product.weightKg} kg
+                </span>
+              </div>
+              {Object.entries(product.technicalSpecs).map(([key, val]) => (
+                <div
+                  key={key}
+                  className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-4 text-xs sm:text-sm"
+                >
+                  <span className="text-[var(--pdp-text-muted)]">{key}</span>
+                  <span className="pdp-mono font-medium text-[var(--pdp-text)] text-right">
+                    {val}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="lg:col-span-5 space-y-6">
+            {/* Key Highlights */}
+            <div className="rounded-[12px] border border-[var(--pdp-border)] bg-[var(--pdp-surface)] p-6 space-y-4">
+              <h3 className="pdp-heading text-lg font-bold text-[var(--pdp-text)]">
                 Engineering Highlights
-              </h4>
-              <ul className="space-y-2 text-xs text-[#B7BCC2]">
-                {product.highlights.map((h, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-[#D6B98C] shrink-0 mt-0.5" />
-                    <span>{h}</span>
+              </h3>
+              <ul className="space-y-3">
+                {product.highlights.map((hl, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2.5 text-sm text-[var(--pdp-text-muted)] leading-relaxed"
+                  >
+                    <Check className="w-4 h-4 text-[var(--pdp-accent)] shrink-0 mt-0.5" />
+                    <span>{hl}</span>
                   </li>
                 ))}
               </ul>
             </div>
-          </div>
 
-          {/* RIGHT: Contiguous Purchase Module */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8 space-y-6">
-              {/* Brand & Title */}
+            {/* Compatible Vehicles or Appliances */}
+            {(product.compatibleVehicles?.length || product.compatibleAppliances?.length) && (
+              <div className="rounded-[12px] border border-[var(--pdp-border)] bg-[var(--pdp-surface)] p-6 space-y-4">
+                <h3 className="pdp-heading text-lg font-bold text-[var(--pdp-text)]">
+                  {product.compatibleVehicles?.length
+                    ? 'Verified Vehicle Fitment'
+                    : 'Supported Load Profiles'}
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {(product.compatibleVehicles || product.compatibleAppliances || []).map(
+                    (entry, idx) => (
+                      <span
+                        key={idx}
+                        className="pdp-mono text-xs px-3 py-1.5 rounded-full bg-[var(--pdp-surface-2)] border border-[var(--pdp-border)] text-[var(--pdp-text)]"
+                      >
+                        {entry}
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Live Star-Rating & Customer Reviews System */}
+        <ProductReviewsSection
+          product={product}
+          configuredVariantLabel={`${selectedFinish.name} · ${selectedCapacity.label}`}
+          onStatsChange={handleReviewStatsChange}
+        />
+
+        {/* Related Units */}
+        {relatedProducts.length > 0 && (
+          <div className="pt-12 border-t border-[var(--pdp-border)] space-y-6">
+            <div className="flex items-end justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 text-xs text-[#8E959E] uppercase font-mono tracking-wider">
-                  <span>{product.brand}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{product.technology}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="text-[#D6B98C]">SKU: {product.id.toUpperCase()}</span>
-                </div>
-
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#F2F0EA] tracking-tight mt-1.5 leading-snug">
-                  {product.name}
-                </h1>
-
-                {/* Rating */}
-                <div className="flex items-center gap-2 mt-3 text-xs">
-                  <div className="flex items-center text-[#D6B98C]">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-3.5 h-3.5 ${
-                          i < Math.floor(product.rating)
-                            ? 'fill-current'
-                            : 'text-[#343940]'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="font-semibold text-[#F2F0EA]">{product.rating}</span>
-                  <span className="text-[#8E959E]">({product.reviewCount} verified reviews)</span>
-                  <span className="text-[#343940]">|</span>
-                  <span className="text-[#D6B98C] font-mono">In Stock ({product.stockCount} units)</span>
-                </div>
+                <p className="pdp-mono text-xs uppercase tracking-[0.14em] text-[var(--pdp-accent)]">
+                  Explore Lineup
+                </p>
+                <h3 className="pdp-heading text-2xl sm:text-3xl font-bold text-[var(--pdp-text)] mt-1">
+                  Related architecture.
+                </h3>
               </div>
-
-              {/* Pricing Box */}
-              <div className="p-4 bg-[#17191C] border border-[#25282D] rounded-xl flex items-center justify-between">
-                <div>
-                  <div className="text-2xl sm:text-3xl font-bold text-[#F2F0EA] font-mono tabular-nums">
-                    ₹{effectivePrice.toLocaleString('en-IN')}
-                    {exchangeScrap && (
-                      <span className="text-xs text-[#D6B98C] font-normal ml-2">
-                        (with ₹{scrapDiscount} Old Scrap Rebate)
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-[#8E959E] mt-0.5">
-                    <span className="line-through font-mono">
-                      MRP: ₹{product.originalPrice.toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-[#A87555] font-semibold">
-                      Save {product.discountPercent}%
-                    </span>
-                    <span>(Inclusive of all 18% GST)</span>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-xs font-mono bg-[#25282D] text-[#D6B98C] px-2.5 py-1 rounded border border-[#343940]">
-                    {product.warrantyMonths} Months Warranty
-                  </span>
-                </div>
-              </div>
-
-              {/* Scrap Exchange Toggle */}
-              <div className="p-4 bg-[#17191C] border border-[#343940] rounded-xl">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={exchangeScrap}
-                    onChange={(e) => setExchangeScrap(e.target.checked)}
-                    className="mt-1 rounded bg-[#25282D] border-[#343940] text-[#D6B98C] focus:ring-0"
-                  />
-                  <div>
-                    <span className="text-xs font-semibold text-[#F2F0EA] block">
-                      Opt for Old Dead Battery Scrap Exchange (-₹{Math.min(1200, Math.round(product.price * 0.12))})
-                    </span>
-                    <span className="text-[11px] text-[#8E959E] mt-0.5 block">
-                      Our certified technician tests and carries away your old battery upon doorstep delivery. Instant cashback credited on the spot!
-                    </span>
-                  </div>
-                </label>
-              </div>
-
-              {/* Key Specs Matrix Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
-                <div className="p-2.5 bg-[#17191C] border border-[#25282D] rounded-lg">
-                  <span className="text-[10px] text-[#8E959E] block">CAPACITY</span>
-                  <span className="text-[#F2F0EA] font-semibold">{product.capacityAh} Ah</span>
-                </div>
-                <div className="p-2.5 bg-[#17191C] border border-[#25282D] rounded-lg">
-                  <span className="text-[10px] text-[#8E959E] block">VOLTAGE</span>
-                  <span className="text-[#F2F0EA] font-semibold">{product.voltage}</span>
-                </div>
-                <div className="p-2.5 bg-[#17191C] border border-[#25282D] rounded-lg">
-                  <span className="text-[10px] text-[#8E959E] block">WEIGHT</span>
-                  <span className="text-[#F2F0EA] font-semibold">{product.weightKg} kg</span>
-                </div>
-                <div className="p-2.5 bg-[#17191C] border border-[#25282D] rounded-lg">
-                  <span className="text-[10px] text-[#8E959E] block">CCA CRANKING</span>
-                  <span className="text-[#D6B98C] font-semibold">
-                    {product.coldCrankingAmps ? `${product.coldCrankingAmps} CCA` : 'Deep Cycle'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Doorstep Delivery & Pincode Checker */}
-              <div className="pt-2">
-                <div className="text-xs font-mono uppercase text-[#8E959E] mb-2 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#D6B98C]" />
-                  <span>Check Delivery & Free Doorstep Fitment</span>
-                </div>
-                <form onSubmit={handlePincodeCheck} className="flex gap-2">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    placeholder="Enter 6-digit PIN (e.g. 400050, 560001)"
-                    className="flex-1 bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] px-3.5 py-2 rounded-lg focus:outline-none focus:border-[#D6B98C] font-mono"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-[#25282D] hover:bg-[#343940] text-xs text-[#F2F0EA] font-semibold rounded-lg border border-[#343940]"
-                  >
-                    Check
-                  </button>
-                </form>
-
-                {pinResult && (
-                  <div className="mt-2.5 text-xs text-[#B7BCC2] bg-[#17191C] border border-[#25282D] p-3 rounded-lg flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Truck className="w-4 h-4 text-[#D6B98C]" />
-                      <span>
-                        Delivery to <strong className="text-[#F2F0EA]">{pinResult.city}</strong> in{' '}
-                        {pinResult.estimateDays === 1
-                          ? 'Today / Within 4 Hours'
-                          : `${pinResult.estimateDays} Business Days`}
-                      </span>
-                    </span>
-                    <span className="text-[#D6B98C] font-semibold font-mono">Free Installation</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Quantity and Actions */}
-              <div className="pt-4 border-t border-[#25282D] space-y-3">
-                <div className="flex items-center gap-4">
-                  {/* Quantity Stepper */}
-                  <div className="flex items-center bg-[#17191C] border border-[#343940] rounded-lg">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="p-2.5 text-[#B7BCC2] hover:text-[#F2F0EA]"
-                      aria-label="Decrease quantity"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="px-4 text-xs font-bold font-mono text-[#F2F0EA]">
-                      {quantity}
-                    </span>
-                    <button
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="p-2.5 text-[#B7BCC2] hover:text-[#F2F0EA]"
-                      aria-label="Increase quantity"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Add to Cart */}
-                  <button
-                    onClick={() => addToCart(product, quantity)}
-                    className="flex-1 py-3 px-5 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg"
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    <span>Add to Cart</span>
-                  </button>
-
-                  {/* Buy Now */}
-                  <button
-                    onClick={handleBuyNow}
-                    className="flex-1 py-3 px-5 bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] border border-[#343940] rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Zap className="w-4 h-4 text-[#D6B98C]" />
-                    <span>Buy Now</span>
-                  </button>
-                </div>
-
-                {/* Secondary Wishlist / Compare buttons */}
-                <div className="flex items-center justify-between text-xs text-[#8E959E] pt-2">
-                  <button
-                    onClick={() => toggleWishlist(product)}
-                    className="flex items-center gap-1.5 hover:text-[#F2F0EA]"
-                  >
-                    <Heart
-                      className={`w-4 h-4 ${
-                        isInWishlist(product.id) ? 'text-[#A87555] fill-current' : ''
-                      }`}
-                    />
-                    <span>{isInWishlist(product.id) ? 'Saved in Wishlist' : 'Add to Wishlist'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => addToComparison(product)}
-                    className="flex items-center gap-1.5 hover:text-[#F2F0EA]"
-                  >
-                    <GitCompare
-                      className={`w-4 h-4 ${
-                        isInComparison(product.id) ? 'text-[#D6B98C]' : ''
-                      }`}
-                    />
-                    <span>Compare with Other Models</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Detailed Technical Specs Table */}
-        <div className="mt-16 bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8">
-          <h3 className="text-xl font-bold text-[#F2F0EA] mb-6">Complete Technical Specifications</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3 text-xs">
-            {Object.entries(product.technicalSpecs).map(([key, val], idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between py-2.5 border-b border-[#25282D]"
+              <button
+                type="button"
+                onClick={() => navigate('shop')}
+                className="pdp-btn text-xs font-medium px-4 py-2 border border-[var(--pdp-border)] hover:border-[var(--pdp-border-strong)] text-[var(--pdp-text)] inline-flex items-center gap-1.5"
               >
-                <span className="text-[#8E959E] font-mono">{key}</span>
-                <span className="text-[#F2F0EA] font-semibold text-right">{val}</span>
-              </div>
-            ))}
-            <div className="flex items-center justify-between py-2.5 border-b border-[#25282D]">
-              <span className="text-[#8E959E] font-mono">Dimensions (L × W × H)</span>
-              <span className="text-[#F2F0EA] font-semibold">{product.dimensions}</span>
+                <span>View Full Catalog</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <div className="flex items-center justify-between py-2.5 border-b border-[#25282D]">
-              <span className="text-[#8E959E] font-mono">Total Filled Weight</span>
-              <span className="text-[#F2F0EA] font-semibold">{product.weightKg} kg</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Compatible Vehicles / Appliances */}
-        {product.compatibleVehicles && (
-          <div className="mt-8 bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8">
-            <h3 className="text-base font-bold text-[#F2F0EA] mb-4">
-              Verified OEM Vehicle Compatibility
-            </h3>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {product.compatibleVehicles.map((veh, i) => (
-                <span
-                  key={i}
-                  className="bg-[#17191C] text-[#B7BCC2] border border-[#25282D] px-3 py-1.5 rounded-lg"
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {relatedProducts.map((rp) => (
+                <button
+                  key={rp.id}
+                  type="button"
+                  onClick={() => navigate('product-detail', { productId: rp.id })}
+                  className="group text-left rounded-[12px] border border-[var(--pdp-border)] bg-[var(--pdp-surface)] hover:border-[var(--pdp-border-strong)] overflow-hidden transition-all"
                 >
-                  {veh}
-                </span>
+                  <div
+                    className="aspect-[4/3] w-full p-6 flex items-center justify-center overflow-hidden"
+                    style={{ backgroundImage: 'var(--pdp-plinth)' }}
+                  >
+                    <img
+                      src={rp.images[0]}
+                      alt={rp.name}
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="p-5 space-y-2 border-t border-[var(--pdp-border)]">
+                    <div className="pdp-mono text-[11px] text-[var(--pdp-text-muted)]">
+                      {rp.voltage} · {rp.capacityAh > 0 ? `${rp.capacityAh}Ah · ` : ''}
+                      {rp.warrantyMonths}M
+                    </div>
+                    <h4 className="pdp-heading text-base font-bold text-[var(--pdp-text)] line-clamp-1">
+                      {rp.name}
+                    </h4>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="pdp-mono text-sm font-medium text-[var(--pdp-text)]">
+                        ₹{rp.price.toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-xs font-medium text-[var(--pdp-accent)] inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                        Inspect
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
           </div>
         )}
+      </section>
 
-        {/* Frequently Bought Together Bundle */}
-        {accessory && (
-          <div className="mt-12 bg-[#101214] border border-[#343940] rounded-2xl p-6 sm:p-8">
-            <div className="text-xs font-mono text-[#D6B98C] uppercase tracking-wider mb-1">
-              Engineered Bundle & Save
-            </div>
-            <h3 className="text-lg font-bold text-[#F2F0EA] mb-4">Frequently Bought Together</h3>
-
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-3 bg-[#17191C] border border-[#25282D] p-3 rounded-xl">
-                  <img
-                    src={product.images[0]}
-                    alt=""
-                    className="w-14 h-14 object-cover rounded bg-[#25282D]"
-                  />
-                  <div>
-                    <div className="text-xs font-semibold text-[#F2F0EA] line-clamp-1">
-                      {product.name}
-                    </div>
-                    <div className="text-xs font-mono text-[#D6B98C]">
-                      ₹{product.price.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-
-                <span className="text-xl font-bold text-[#8E959E]">+</span>
-
-                <div className="flex items-center gap-3 bg-[#17191C] border border-[#25282D] p-3 rounded-xl">
-                  <img
-                    src={accessory.images[0]}
-                    alt=""
-                    className="w-14 h-14 object-cover rounded bg-[#25282D]"
-                  />
-                  <div>
-                    <div className="text-xs font-semibold text-[#F2F0EA] line-clamp-1">
-                      {accessory.name}
-                    </div>
-                    <div className="text-xs font-mono text-[#D6B98C]">
-                      ₹{accessory.price.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-right flex items-center gap-4">
-                <div>
-                  <div className="text-base font-bold text-[#F2F0EA] font-mono tabular-nums">
-                    ₹{(product.price + accessory.price - 500).toLocaleString('en-IN')}
-                  </div>
-                  <div className="text-xs text-[#8E959E]">
-                    Combo Discount: Save ₹500
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    addToCart(product);
-                    addToCart(accessory);
-                    showToast('Bundle added to cart with combo discount!');
-                  }}
-                  className="px-4 py-2.5 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-semibold text-xs rounded-lg transition-colors"
-                >
-                  Buy Both Together
-                </button>
-              </div>
-            </div>
+      {/* =========================================================
+          MINIMAL ARCHITECTURAL PDP FOOTER
+          ========================================================= */}
+      <footer className="border-t border-[var(--pdp-border)] py-8 px-5 sm:px-8 pb-24 lg:pb-8">
+        <div className="max-w-[1240px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--pdp-text-muted)]">
+          <div className="flex items-center gap-3">
+            <span className="pdp-heading font-bold text-sm text-[var(--pdp-text)]">KINETIX</span>
+            <span aria-hidden="true" className="opacity-35">
+              ·
+            </span>
+            <span>Engineered for altitude & endurance.</span>
           </div>
-        )}
-
-        {/* Customer Reviews & Add Review Form */}
-        <div className="mt-16 bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-            <div>
-              <h3 className="text-xl font-bold text-[#F2F0EA]">Customer Technical Feedback</h3>
-              <p className="text-xs text-[#8E959E] mt-1">
-                Real performance logs from vehicle owners and field engineers
-              </p>
-            </div>
-          </div>
-
-          {/* Reviews list */}
-          <div className="space-y-4 mb-10">
-            {reviewsList.map((rev) => (
-              <div key={rev.id} className="bg-[#17191C] border border-[#25282D] p-5 rounded-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-[#F2F0EA]">{rev.author}</span>
-                    <span className="text-[10px] bg-[#25282D] text-[#D6B98C] px-2 py-0.5 rounded font-mono">
-                      Verified Fitment
-                    </span>
-                  </div>
-                  <span className="text-xs text-[#8E959E] font-mono">{rev.date}</span>
-                </div>
-                <div className="flex items-center gap-1 text-[#D6B98C] mb-2">
-                  {[...Array(rev.rating)].map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-current" />
-                  ))}
-                </div>
-                <h4 className="text-xs font-semibold text-[#F2F0EA] mb-1">{rev.title}</h4>
-                <p className="text-xs text-[#B7BCC2] leading-relaxed">{rev.comment}</p>
-                {rev.vehicle && (
-                  <div className="text-[11px] font-mono text-[#8E959E] mt-2">
-                    Vehicle: {rev.vehicle}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Add Review Box */}
-          <div className="border-t border-[#25282D] pt-6">
-            <h4 className="text-sm font-bold text-[#F2F0EA] mb-4">Submit Your Battery Review</h4>
-            <form onSubmit={handleAddReview} className="space-y-4 max-w-xl">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="Your Full Name"
-                  value={newReviewAuthor}
-                  onChange={(e) => setNewReviewAuthor(e.target.value)}
-                  className="bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] px-3 py-2 rounded-lg focus:outline-none focus:border-[#D6B98C]"
-                  required
-                />
-                <select
-                  value={newReviewRating}
-                  onChange={(e) => setNewReviewRating(Number(e.target.value))}
-                  className="bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] px-3 py-2 rounded-lg focus:outline-none focus:border-[#D6B98C]"
-                >
-                  <option value={5}>5 Stars (Exceptional Performance)</option>
-                  <option value={4}>4 Stars (Very Good)</option>
-                  <option value={3}>3 Stars (Satisfactory)</option>
-                </select>
-              </div>
-              <textarea
-                rows={3}
-                placeholder="Share your experience (cranking performance, backup duration, technician installation)..."
-                value={newReviewComment}
-                onChange={(e) => setNewReviewComment(e.target.value)}
-                className="w-full bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] p-3 rounded-lg focus:outline-none focus:border-[#D6B98C]"
-                required
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] text-xs font-semibold rounded-lg transition-colors"
-              >
-                Post Review
-              </button>
-            </form>
+          <div className="flex items-center gap-5 pdp-mono text-[11px]">
+            <button
+              type="button"
+              onClick={() => navigate('shop')}
+              className="hover:text-[var(--pdp-text)] transition-colors"
+            >
+              All Batteries
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('hero')}
+              className="hover:text-[var(--pdp-text)] transition-colors"
+            >
+              Back to Top
+            </button>
+            <span>© 2026 KINETIX</span>
           </div>
         </div>
+      </footer>
+
+      {/* Mobile Sticky Bottom Quick-Add Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 pdp-glass-bar border-t border-[var(--pdp-border)] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="pdp-mono text-[10px] uppercase tracking-[0.1em] text-[var(--pdp-text-muted)] truncate">
+            {selectedFinish.name} · {selectedCapacity.label}
+          </div>
+          <div className="pdp-mono text-base font-bold text-[var(--pdp-text)]">
+            ₹{(effectivePrice * quantity).toLocaleString('en-IN')}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          className="pdp-btn h-11 px-5 bg-[var(--pdp-accent)] hover:bg-[var(--pdp-accent-hover)] text-[#f3f6f4] text-xs font-medium inline-flex items-center gap-2 shrink-0"
+        >
+          <ShoppingBag className="w-3.5 h-3.5" />
+          <span>Add to Bag</span>
+        </button>
       </div>
 
-      {/* Fullscreen Zoom Modal */}
+      {/* Full-Screen Inspection Lightbox Modal */}
       {zoomOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-md"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Product full-screen preview"
+          className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-8"
           onClick={() => setZoomOpen(false)}
         >
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <img
-              src={product.images[selectedImage] || product.images[0]}
-              alt={product.name}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg"
-            />
-            <button
-              onClick={() => setZoomOpen(false)}
-              className="absolute -top-10 right-0 text-white hover:text-[#D6B98C] text-xs font-mono"
-            >
-              [CLICK TO CLOSE]
-            </button>
+          <div
+            className="relative max-w-3xl w-full rounded-[12px] overflow-hidden bg-[var(--pdp-surface)] border border-[var(--pdp-border-strong)] p-6 sm:p-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="pdp-mono text-xs text-[var(--pdp-text-muted)]">
+                {product.name} · {selectedFinish.name}
+              </div>
+              <button
+                type="button"
+                onClick={() => setZoomOpen(false)}
+                aria-label="Close full-screen preview"
+                className="pdp-btn w-9 h-9 bg-[var(--pdp-surface-2)] text-[var(--pdp-text)] inline-flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="aspect-[4/3] w-full flex items-center justify-center">
+              <img
+                src={product.images[0]}
+                alt={product.name}
+                style={{ filter: selectedFinish.filter }}
+                className="max-h-full max-w-full object-contain rounded-[12px]"
+              />
+            </div>
           </div>
         </div>
       )}

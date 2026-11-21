@@ -1,156 +1,360 @@
-import React from 'react';
-import { ArrowRight, ShieldCheck, Zap, Gauge, Flame, Check } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+
+// Scenic full-bleed environmental photography (identical to Product Detail Showcase)
+import basaltStudioBg from '../../assets/images/pdp_scene_basalt_studio_1795162651492.jpg';
+import alpineFrostBg from '../../assets/images/pdp_scene_alpine_frost_1795162652752.jpg';
+import warmSunriseBg from '../../assets/images/pdp_scene_warm_sunrise_1795162657178.jpg';
+import duskLakesideBg from '../../assets/images/pdp_scene_dusk_lakeside_1795162750558.jpg';
+
+gsap.registerPlugin(ScrollTrigger);
+
+interface ShowcaseBatteryStage {
+  id: string;
+  indexLabel: string;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  productId: string;
+  productLabel: string;
+}
+
+const SHOWCASE_STAGES: ShowcaseBatteryStage[] = [
+  {
+    id: 'basalt-studio',
+    indexLabel: '01',
+    eyebrow: 'STUDIO BASALT SLATE · TITANIUM LITHIUM',
+    title: 'Precision cast. Zero compromise.',
+    subtitle:
+      '48V LiFePO4 titanium-alloy architecture sealed inside a vibration-damped IP67 chassis with 6,000+ cycle endurance.',
+    image: basaltStudioBg,
+    productId: 'powergrid-megarack-48v',
+    productLabel: 'POWERGRID 48V 200Ah',
+  },
+  {
+    id: 'alpine-frost',
+    indexLabel: '02',
+    eyebrow: 'SUB-ZERO RIVERBANK · PURE LEAD AGM',
+    title: 'Instant cold-crank authority.',
+    subtitle:
+      'Delivers 760 CCA down to -35°C with ultra-low internal impedance and zero voltage sag on luxury start-stop powertrains.',
+    image: alpineFrostBg,
+    productId: 'kinetix-aeon-75',
+    productLabel: 'KINETIX AEON AGM Ultra-75',
+  },
+  {
+    id: 'granite-ridge',
+    indexLabel: '03',
+    eyebrow: 'ALPINE GRANITE RIDGE · SOLAR LITHIUM ESS',
+    title: 'Harvest peak solar yield.',
+    subtitle:
+      '2.5-hour rapid multi-stage recharge engineered for high-altitude off-grid solar arrays and regenerative systems.',
+    image: warmSunriseBg,
+    productId: 'solaris-h5-lithium-wall',
+    productLabel: 'SOLARIS H5 5.12kWh',
+  },
+  {
+    id: 'dusk-lakeside',
+    indexLabel: '04',
+    eyebrow: 'DUSK LAKESIDE OUTPOST · DEEP-CYCLE RESERVE',
+    title: 'Silent overnight endurance.',
+    subtitle:
+      'Deep-cycle architectural longevity backed by up to 120-month direct factory protection and 4-hour doorstep fitment.',
+    image: duskLakesideBg,
+    productId: 'voltmax-powercore-220',
+    productLabel: 'VOLTMAX PowerCore+ 220Ah',
+  },
+];
 
 export const Hero: React.FC = () => {
   const { navigate } = useStore();
 
-  return (
-    <section className="relative bg-[#17191C] overflow-hidden border-b border-[#25282D]">
-      {/* Background ambient lighting */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#D6B98C]/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-10 w-80 h-80 bg-[#A87555]/5 rounded-full blur-3xl pointer-events-none" />
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const layerRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const triggerRef = useRef<ScrollTrigger | null>(null);
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          {/* Left Column: Editorial Headline & Narrative */}
-          <div className="lg:col-span-6 space-y-6 z-10">
-            {/* Quiet technical kicker */}
-            <div className="flex items-center gap-2 text-xs font-mono text-[#D6B98C] tracking-wide uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#D6B98C]"></span>
-              <span>Next-Generation Energy Engineering</span>
-              <span aria-hidden="true" className="text-[#343940]">·</span>
-              <span className="text-[#B7BCC2]">Automotive & Industrial</span>
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [transitioning, setTransitioning] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const switchStageLabel = (nextIdx: number) => {
+    setActiveIndex((prev) => {
+      if (prev === nextIdx) return prev;
+      setTransitioning(true);
+      window.setTimeout(() => setTransitioning(false), 180);
+      return nextIdx;
+    });
+  };
+
+  // GSAP ScrollTrigger pinned 4-stage horizontal clip-path curtain wipes (identical to PDP PinnedShowcase)
+  useEffect(() => {
+    if (reducedMotion || !sectionRef.current) {
+      triggerRef.current = null;
+      return;
+    }
+
+    const ctx = gsap.context(() => {
+      const layers = layerRefs.current.filter(Boolean) as HTMLDivElement[];
+      if (layers.length < 2) return;
+
+      layers.forEach((el, idx) => {
+        gsap.set(el, {
+          clipPath: idx === 0 ? 'inset(0% 0% 0% 0%)' : 'inset(0% 0% 0% 100%)',
+        });
+      });
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: 'top top',
+          end: '+=280%',
+          pin: true,
+          scrub: 0.75,
+          anticipatePin: 1,
+          onUpdate: (self) => {
+            const p = self.progress;
+            const idx = Math.min(
+              SHOWCASE_STAGES.length - 1,
+              Math.floor(p * SHOWCASE_STAGES.length * 0.999)
+            );
+            switchStageLabel(idx);
+          },
+        },
+      });
+
+      triggerRef.current = tl.scrollTrigger || null;
+
+      // Explicit dwell time per frame + smooth horizontal clip-path wipes
+      tl.to({}, { duration: 0.35 });
+      for (let i = 1; i < layers.length; i++) {
+        tl.to(layers[i], {
+          clipPath: 'inset(0% 0% 0% 0%)',
+          duration: 0.65,
+          ease: 'none',
+        });
+        tl.to({}, { duration: 0.35 });
+      }
+    }, sectionRef);
+
+    return () => {
+      triggerRef.current = null;
+      ctx.revert();
+    };
+  }, [reducedMotion]);
+
+  const handleSelectStage = (idx: number) => {
+    if (reducedMotion || !triggerRef.current) {
+      switchStageLabel(idx);
+      return;
+    }
+    const st = triggerRef.current;
+    const ratios = [0.05, 0.36, 0.66, 0.96];
+    const targetProgress = ratios[idx] ?? idx / Math.max(1, SHOWCASE_STAGES.length - 1);
+    const targetScroll = st.start + (st.end - st.start) * targetProgress;
+    window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    switchStageLabel(idx);
+  };
+
+  const currentStage = SHOWCASE_STAGES[activeIndex] || SHOWCASE_STAGES[0];
+
+  return (
+    <div className="bg-white">
+      {/* =========================================================
+          PINNED 4-STAGE ENVIRONMENTAL SHOWCASE (Matches PDP 1-to-1)
+          ========================================================= */}
+      <section
+        ref={sectionRef}
+        aria-label="KINETIX environmental battery performance showcase"
+        className="relative w-full h-[92dvh] sm:h-[100dvh] min-h-[520px] overflow-hidden bg-[#0c100e]"
+      >
+        {/* 4 Full-Bleed Environmental Layers */}
+        {SHOWCASE_STAGES.map((stage, idx) => {
+          const reducedStyle = reducedMotion
+            ? {
+                opacity: idx === activeIndex ? 1 : 0,
+                transition: 'opacity 0.35s ease',
+              }
+            : undefined;
+
+          return (
+            <div
+              key={stage.id}
+              ref={(el) => {
+                layerRefs.current[idx] = el;
+              }}
+              style={reducedStyle}
+              className="absolute inset-0 w-full h-full will-change-[clip-path]"
+            >
+              <img
+                src={stage.image}
+                alt={`${stage.eyebrow} — ${stage.title}`}
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover object-center select-none"
+              />
+            </div>
+          );
+        })}
+
+        {/* Bottom Edge Dark Gradient Scrim (Crisp Legibility Without Card Boxes) */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 h-[54%] pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(to top, rgba(12, 16, 14, 0.92) 0%, rgba(12, 16, 14, 0.56) 48%, rgba(12, 16, 14, 0) 100%)',
+          }}
+        />
+
+        {/* Subtle Top Vignette */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-24 pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(12, 16, 14, 0.42) 0%, rgba(12, 16, 14, 0) 100%)',
+          }}
+        />
+
+        {/* Bottom HUD Overlay — Exact PDP PinnedShowcase Structure */}
+        <div className="absolute inset-x-0 bottom-0 z-20 max-w-[1240px] mx-auto px-4 sm:px-8 pb-6 sm:pb-12 flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6">
+          {/* Left: Monospace Chapter Index + Oversized Editorial Headline + Subtitle + Direct Battery Link */}
+          <div
+            className="max-w-2xl min-w-0 transition-all duration-300"
+            style={{
+              opacity: transitioning ? 0.35 : 1,
+              filter: transitioning ? 'blur(4px)' : 'blur(0px)',
+              transform: transitioning ? 'translateY(4px)' : 'translateY(0)',
+            }}
+          >
+            <div className="pdp-mono text-[10px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.14em] text-[#b4bdb8] mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 tabular-nums">
+              <span>
+                {currentStage.indexLabel} / 0{SHOWCASE_STAGES.length}
+              </span>
+              <span aria-hidden="true" className="opacity-40">
+                —
+              </span>
+              <span>{currentStage.eyebrow}</span>
             </div>
 
-            {/* Apple/Automotive-tier Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[#F2F0EA] leading-[1.08] text-balance">
-              ENERGY WITHOUT COMPROMISE.
-            </h1>
+            <h2 className="pdp-heading text-2xl sm:text-5xl lg:text-[54px] font-bold text-[#eff3f1] leading-[1.04] text-balance">
+              {currentStage.title}
+            </h2>
 
-            {/* Supporting description */}
-            <p className="text-base sm:text-lg text-[#B7BCC2] leading-relaxed max-w-xl">
-              Discover advanced battery solutions engineered for reliability, endurance, and the power to move everything forward—from luxury automotive start-stop powertrains to high-voltage solar microgrids.
+            <p className="text-xs sm:text-base text-[#cfd8d3] mt-2.5 sm:mt-3 max-w-xl leading-relaxed">
+              {currentStage.subtitle}
             </p>
 
-            {/* High-Intent CTAs */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            {/* Clean Inline Action Links */}
+            <div className="mt-4 sm:mt-5 flex flex-wrap items-center gap-3 sm:gap-4">
               <button
+                type="button"
+                onClick={() =>
+                  navigate('product-detail', { productId: currentStage.productId })
+                }
+                className="max-w-full inline-flex items-center gap-2 min-h-[42px] px-4 sm:px-5 py-2.5 rounded-full bg-[#eff3f1] hover:bg-[#D9AE6D] text-[#0c100e] text-xs sm:text-sm font-semibold transition-all active:scale-[0.97]"
+              >
+                <span className="truncate">Inspect {currentStage.productLabel}</span>
+                <ArrowUpRight className="w-4 h-4 shrink-0" />
+              </button>
+
+              <button
+                type="button"
                 onClick={() => navigate('shop')}
-                className="inline-flex items-center gap-2 px-6 py-3.5 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] text-sm font-semibold rounded-lg transition-colors shadow-lg"
+                className="inline-flex items-center gap-1.5 min-h-[42px] text-xs sm:text-sm font-medium text-[#cfd8d3] hover:text-[#eff3f1] transition-colors whitespace-nowrap shrink-0"
               >
-                <span>Explore Collection</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Explore Full Lineup</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
-
-              <button
-                onClick={() => {
-                  const elem = document.getElementById('compatibility-finder');
-                  if (elem) elem.scrollIntoView({ behavior: 'smooth' });
-                  else navigate('shop');
-                }}
-                className="inline-flex items-center gap-2 px-6 py-3.5 bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] border border-[#343940] text-sm font-semibold rounded-lg transition-colors"
-              >
-                <Zap className="w-4 h-4 text-[#D6B98C]" />
-                <span>Find Your Battery</span>
-              </button>
-            </div>
-
-            {/* Subtle verification points */}
-            <div className="pt-4 flex flex-wrap items-center gap-6 text-xs text-[#8E959E] border-t border-[#25282D]">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-[#D6B98C]" />
-                <span className="text-[#F2F0EA]">Doorstep 4-Hour Fitment</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-[#D6B98C]" />
-                <span className="text-[#F2F0EA]">Instant Old Scrap Rebate</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-[#D6B98C]" />
-                <span className="text-[#F2F0EA]">Up to 120M Warranty</span>
-              </div>
             </div>
           </div>
 
-          {/* Right Column: Cinematic 3D Battery Showcase */}
-          <div className="lg:col-span-6 relative flex justify-center">
-            <div className="relative w-full max-w-lg lg:max-w-none">
-              {/* Product Frame with metallic border */}
-              <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-[#25282D] to-[#17191C] border border-[#343940] shadow-2xl p-2 sm:p-3">
-                <img
-                  src="/src/assets/images/hero_battery_titanium_1794476148118.jpg"
-                  alt="KINETIX Titanium Lithium Battery Unit"
-                  referrerPolicy="no-referrer"
-                  className="w-full h-auto object-cover rounded-xl transition-transform duration-700 hover:scale-[1.02]"
-                />
-
-                {/* Floating Top Performance Badge */}
-                <div className="absolute top-6 left-6 bg-[#17191C]/90 backdrop-blur-md border border-[#D6B98C]/30 px-3.5 py-1.5 rounded-md text-xs text-[#F2F0EA] flex items-center gap-2 shadow-xl">
-                  <div className="w-2 h-2 rounded-full bg-[#D6B98C]" />
-                  <span className="font-mono text-[11px] text-[#D6B98C]">TITANIUM ALLOY · 48V 10.5kWh</span>
-                </div>
-
-                {/* Floating Bottom Specs Tag */}
-                <div className="absolute bottom-6 right-6 hidden sm:flex items-center gap-3 bg-[#17191C]/95 backdrop-blur-md border border-[#343940] px-4 py-2 rounded-lg text-xs shadow-xl">
-                  <Gauge className="w-4 h-4 text-[#A87555]" />
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wider text-[#8E959E] font-mono">
-                      Cycle Endurance
-                    </div>
-                    <div className="text-xs font-semibold text-[#F2F0EA]">
-                      6,000+ Cycles @ 90% DoD
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Decorative technical coordinate callouts */}
-              <div className="hidden xl:block absolute -left-6 top-1/2 -translate-y-1/2 bg-[#25282D]/80 backdrop-blur-md border border-[#343940] p-3 rounded-lg text-[11px] font-mono text-[#B7BCC2] space-y-1">
-                <div className="text-[#D6B98C] font-semibold">ESR &lt; 0.8 mΩ</div>
-                <div className="text-[#8E959E]">Active Balance BMS</div>
-                <div className="text-[#8E959E]">IP67 Heavy Casing</div>
-              </div>
-            </div>
+          {/* Right: Clickable Glassmorphic Pill Progress Dots */}
+          <div
+            role="tablist"
+            aria-label="Battery showcase environments"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-white/15 bg-[#0c100e]/60 backdrop-blur-xl self-start md:self-end shrink-0"
+          >
+            {SHOWCASE_STAGES.map((stage, idx) => {
+              const isSelected = idx === activeIndex;
+              return (
+                <button
+                  key={stage.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  aria-label={`Jump to ${stage.eyebrow}`}
+                  onClick={() => handleSelectStage(idx)}
+                  className="pdp-btn h-7 px-2 flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#eff3f1]"
+                >
+                  <span
+                    className="block h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: isSelected ? '26px' : '8px',
+                      backgroundColor: isSelected
+                        ? '#eff3f1'
+                        : 'rgba(239, 243, 241, 0.38)',
+                    }}
+                  />
+                </button>
+              );
+            })}
           </div>
         </div>
+      </section>
 
-        {/* 4-Metric Full-Width Engineering Strip */}
-        <div className="mt-16 sm:mt-20 pt-8 border-t border-[#25282D] grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+      {/* =========================================================
+          CLEAN 4-METRIC FULL-WIDTH ENGINEERING STRIP
+          ========================================================= */}
+      <section className="border-b border-gray-200 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
           <div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono text-[#D6B98C] tabular-nums">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-[#0B3027] tabular-nums">
               45+ Cities
             </div>
-            <div className="text-xs text-[#8E959E] mt-1">
-              Guaranteed 4-hour express doorstep delivery and testing.
+            <div className="text-xs text-gray-600 mt-1">
+              Guaranteed 4-hour express doorstep delivery and fitment.
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono text-[#F2F0EA] tabular-nums">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-[#B59562] tabular-nums">
               760 CCA
             </div>
-            <div className="text-xs text-[#8E959E] mt-1">
+            <div className="text-xs text-gray-600 mt-1">
               Instant sub-zero automotive ignition performance.
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono text-[#D6B98C] tabular-nums">
-              10 Years
+            <div className="text-xl sm:text-2xl font-bold font-mono text-[#0B3027] tabular-nums">
+              Up to 120M
             </div>
-            <div className="text-xs text-[#8E959E] mt-1">
-              Direct manufacturer warranty on commercial LiFePO4 packs.
+            <div className="text-xs text-gray-600 mt-1">
+              Direct manufacturer warranty on lithium & tubular packs.
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono text-[#F2F0EA] tabular-nums">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-[#B59562] tabular-nums">
               100% Recycled
             </div>
-            <div className="text-xs text-[#8E959E] mt-1">
-              Direct scrap exchange rebate with certified zero-effluent smelting.
+            <div className="text-xs text-gray-600 mt-1">
+              Instant scrap exchange rebate with certified zero-effluent smelting.
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 };

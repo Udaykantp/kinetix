@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Truck, RotateCcw, Lock, FileText, Ban } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 
@@ -6,6 +6,17 @@ export const PolicyPages: React.FC = () => {
   const { pageParams, navigate } = useStore();
   const initialType = pageParams?.type || 'warranty';
   const [activePolicy, setActivePolicy] = useState<string>(initialType);
+
+  useEffect(() => {
+    if (pageParams?.type) {
+      setActivePolicy(pageParams.type);
+    }
+  }, [pageParams?.type]);
+
+  const handlePolicySelect = (type: string) => {
+    setActivePolicy(type);
+    navigate('policy', { type }, { replace: true, skipScroll: true });
+  };
 
   const POLICIES: Record<
     string,
@@ -92,7 +103,7 @@ export const PolicyPages: React.FC = () => {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActivePolicy(tab.id)}
+              onClick={() => handlePolicySelect(tab.id)}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activePolicy === tab.id
                   ? 'bg-[#D6B98C] text-[#17191C] font-bold'
@@ -105,13 +116,13 @@ export const PolicyPages: React.FC = () => {
         </div>
 
         {/* Policy Content Card */}
-        <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-8 sm:p-12 space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[#25282D] border border-[#D6B98C]/30 flex items-center justify-center text-[#D6B98C]">
-              <Icon className="w-6 h-6" />
+        <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-5 sm:p-10 space-y-6">
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#25282D] border border-[#D6B98C]/30 flex items-center justify-center text-[#D6B98C] shrink-0">
+              <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-[#F2F0EA]">{current.title}</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#F2F0EA]">{current.title}</h1>
               <p className="text-xs text-[#8E959E] mt-0.5">{current.subtitle}</p>
             </div>
           </div>
@@ -124,7 +135,7 @@ export const PolicyPages: React.FC = () => {
             ))}
           </div>
 
-          <div className="pt-6 border-t border-[#25282D] text-xs text-[#8E959E] flex items-center justify-between font-mono">
+          <div className="pt-6 border-t border-[#25282D] text-xs text-[#8E959E] flex flex-wrap items-center justify-between gap-2 font-mono">
             <span>Last Updated: February 2026</span>
             <span>Ref: KTX-LEGAL-REG-04</span>
           </div>

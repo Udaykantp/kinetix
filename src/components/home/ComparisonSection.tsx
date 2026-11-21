@@ -45,44 +45,52 @@ export const ComparisonSection: React.FC = () => {
   ];
 
   return (
-    <section className="py-20 bg-[#17191C] border-b border-[#25282D]">
+    <section className="py-20 bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
           <div>
-            <div className="text-xs font-mono text-[#D6B98C] uppercase tracking-wider mb-2">
+            <div className="text-xs font-mono text-[#B59562] uppercase tracking-wider mb-2 font-semibold">
               Performance Benchmark
             </div>
-            <h2 className="text-3xl font-bold text-[#F2F0EA] tracking-tight">
+            <h2 className="text-3xl font-bold text-gray-950 tracking-tight">
               Compare Battery Chemistries
             </h2>
           </div>
           <button
             onClick={() => navigate('compare')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#25282D] hover:bg-[#343940] text-[#D6B98C] border border-[#343940] rounded-lg text-xs font-semibold transition-colors"
+            className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300 rounded-lg text-xs font-semibold transition-colors shadow-xs self-start md:self-auto"
           >
             <span>Open Interactive Product Comparator</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-3.5 h-3.5 text-[#B59562] shrink-0" />
           </button>
         </div>
 
-        {/* Clean Spec Table */}
-        <div className="overflow-x-auto bg-[#101214] border border-[#25282D] rounded-xl">
-          <table className="w-full text-left text-xs">
+        <div className="sm:hidden flex items-center justify-between text-[11px] text-gray-500 mb-2.5 px-1">
+          <span className="inline-flex items-center gap-1">
+            <ArrowRight className="w-3 h-3 text-[#B59562]" />
+            <span>Swipe table horizontally to compare</span>
+          </span>
+          <span className="font-mono text-[#B59562]">3 Chemistries</span>
+        </div>
+
+        {/* Clean Spec Table with Sticky Left Column */}
+        <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl shadow-xs">
+          <table className="w-full text-left text-xs min-w-[540px]">
             <thead>
-              <tr className="border-b border-[#25282D] bg-[#17191C]/50 text-[#8E959E] font-mono uppercase tracking-wider">
-                <th className="py-4 px-6 font-semibold">Technical Parameter</th>
-                <th className="py-4 px-6 font-semibold text-[#8E959E]">Standard Flooded</th>
-                <th className="py-4 px-6 font-semibold text-[#B7BCC2]">KINETIX Pure Lead AGM</th>
-                <th className="py-4 px-6 font-semibold text-[#D6B98C]">KINETIX LiFePO4 Lithium</th>
+              <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 font-mono uppercase tracking-wider">
+                <th className="sticky left-0 z-10 bg-gray-50 border-r border-gray-200 py-3.5 sm:py-4 px-3 sm:px-6 w-36 sm:w-auto font-semibold shadow-[2px_0_5px_rgba(0,0,0,0.03)]">Technical Parameter</th>
+                <th className="py-3.5 sm:py-4 px-4 sm:px-5 font-semibold text-gray-500">Standard Flooded</th>
+                <th className="py-3.5 sm:py-4 px-4 sm:px-5 font-semibold text-gray-900">KINETIX Pure Lead AGM</th>
+                <th className="py-3.5 sm:py-4 px-4 sm:px-5 font-semibold text-[#B59562]">KINETIX LiFePO4 Lithium</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#25282D] text-[#B7BCC2]">
+            <tbody className="divide-y divide-gray-100 text-gray-600">
               {compData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-[#17191C]/60 transition-colors">
-                  <td className="py-4 px-6 font-semibold text-[#F2F0EA]">{row.feature}</td>
-                  <td className="py-4 px-6 text-[#8E959E]">{row.flooded}</td>
-                  <td className="py-4 px-6 text-[#F2F0EA] font-medium">{row.agm}</td>
-                  <td className="py-4 px-6 text-[#D6B98C] font-semibold">{row.lithium}</td>
+                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                  <td className="sticky left-0 z-10 bg-white border-r border-gray-200 py-3.5 sm:py-4 px-3 sm:px-6 w-36 sm:w-auto font-semibold text-gray-950 shadow-[2px_0_5px_rgba(0,0,0,0.03)]">{row.feature}</td>
+                  <td className="py-3.5 sm:py-4 px-4 sm:px-6 text-gray-400">{row.flooded}</td>
+                  <td className="py-3.5 sm:py-4 px-4 sm:px-6 text-gray-900 font-medium">{row.agm}</td>
+                  <td className="py-3.5 sm:py-4 px-4 sm:px-6 text-[#B59562] font-semibold">{row.lithium}</td>
                 </tr>
               ))}
             </tbody>

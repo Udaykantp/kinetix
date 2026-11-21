@@ -15,6 +15,7 @@ import { useStore } from '../../context/StoreContext';
 export const CartPage: React.FC = () => {
   const {
     cart,
+    addToCart,
     updateCartQuantity,
     removeFromCart,
     clearCart,
@@ -54,14 +55,14 @@ export const CartPage: React.FC = () => {
           <span className="text-[#D6B98C]">Shopping Bag</span>
         </div>
 
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-[#F2F0EA] tracking-tight">
             Review Your Energy Cart ({cart.length} Models)
           </h1>
           {cart.length > 0 && (
             <button
               onClick={clearCart}
-              className="text-xs text-[#8E959E] hover:text-red-400 font-mono transition-colors"
+              className="text-xs text-[#8E959E] hover:text-red-400 font-mono transition-colors py-1"
             >
               Empty Cart
             </button>
@@ -92,13 +93,13 @@ export const CartPage: React.FC = () => {
                   key={item.product.id}
                   className="bg-[#101214] border border-[#25282D] rounded-xl p-5 flex flex-col sm:flex-row items-center gap-5 justify-between"
                 >
-                  <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div className="flex items-center gap-4 w-full sm:w-auto min-w-0">
                     <img
                       src={item.product.images[0]}
                       alt={item.product.name}
                       className="w-20 h-20 object-cover rounded-lg bg-[#25282D] shrink-0 border border-[#343940]"
                     />
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="text-[10px] font-mono text-[#8E959E] uppercase">
                         {item.product.brand} · {item.product.technology}
                       </div>
@@ -121,20 +122,22 @@ export const CartPage: React.FC = () => {
                   </div>
 
                   {/* Quantity and Line Total */}
-                  <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-[#25282D]">
+                  <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-[#25282D] shrink-0">
                     <div className="flex items-center bg-[#17191C] border border-[#343940] rounded-lg">
                       <button
                         onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
-                        className="px-2.5 py-1.5 text-[#8E959E] hover:text-[#F2F0EA]"
+                        aria-label="Decrease quantity"
+                        className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[#8E959E] hover:text-[#F2F0EA]"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-3 text-xs font-mono font-bold text-[#F2F0EA]">
+                      <span className="px-2.5 text-xs font-mono font-bold text-[#F2F0EA]">
                         {item.quantity}
                       </span>
                       <button
                         onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
-                        className="px-2.5 py-1.5 text-[#8E959E] hover:text-[#F2F0EA]"
+                        aria-label="Increase quantity"
+                        className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[#8E959E] hover:text-[#F2F0EA]"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -166,13 +169,13 @@ export const CartPage: React.FC = () => {
                         key={prod.id}
                         className="p-3 bg-[#17191C] border border-[#25282D] rounded-lg flex items-center justify-between gap-3"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <img
                             src={prod.images[0]}
-                            alt=""
-                            className="w-12 h-12 object-cover rounded bg-[#25282D]"
+                            alt={prod.name}
+                            className="w-12 h-12 object-cover rounded bg-[#25282D] shrink-0"
                           />
-                          <div>
+                          <div className="min-w-0">
                             <h4 className="text-xs font-semibold text-[#F2F0EA] line-clamp-1">
                               {prod.name}
                             </h4>
@@ -182,10 +185,8 @@ export const CartPage: React.FC = () => {
                           </div>
                         </div>
                         <button
-                          onClick={() => {
-                            useStore().addToCart(prod);
-                          }}
-                          className="px-2.5 py-1.5 bg-[#25282D] hover:bg-[#343940] text-xs text-[#F2F0EA] rounded border border-[#343940]"
+                          onClick={() => addToCart(prod)}
+                          className="shrink-0 min-h-[36px] px-3 py-1.5 bg-[#25282D] hover:bg-[#343940] text-xs text-[#F2F0EA] rounded border border-[#343940]"
                         >
                           + Add
                         </button>
@@ -228,11 +229,11 @@ export const CartPage: React.FC = () => {
                         placeholder="Coupon (e.g. VOLT15, TITANIUM)"
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value)}
-                        className="flex-1 bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] px-3 py-2.5 rounded-l-lg focus:outline-none focus:border-[#D6B98C] font-mono"
+                        className="flex-1 min-w-0 bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] px-3 py-2.5 rounded-l-lg focus:outline-none focus:border-[#D6B98C] font-mono"
                       />
                       <button
                         type="submit"
-                        className="px-4 py-2.5 bg-[#25282D] hover:bg-[#343940] text-[#D6B98C] text-xs font-semibold rounded-r-lg border border-l-0 border-[#343940]"
+                        className="shrink-0 px-4 py-2.5 bg-[#25282D] hover:bg-[#343940] text-[#D6B98C] text-xs font-semibold rounded-r-lg border border-l-0 border-[#343940]"
                       >
                         Apply
                       </button>

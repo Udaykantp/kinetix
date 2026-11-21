@@ -63,39 +63,43 @@ export const BuyingGuidePage: React.FC = () => {
                   <span className="font-semibold text-[#F2F0EA] block">Ceiling Fans (75W each)</span>
                   <span className="text-[11px] text-[#8E959E]">{fans * 75} Watts total load</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => setFans(Math.max(0, fans - 1))}
-                    className="w-7 h-7 rounded bg-[#25282D] text-[#F2F0EA] font-bold"
+                    aria-label="Decrease ceiling fans"
+                    className="w-9 h-9 rounded-lg bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] font-bold flex items-center justify-center"
                   >
                     -
                   </button>
                   <span className="font-mono font-bold text-[#D6B98C] w-6 text-center">{fans}</span>
                   <button
                     onClick={() => setFans(fans + 1)}
-                    className="w-7 h-7 rounded bg-[#25282D] text-[#F2F0EA] font-bold"
+                    aria-label="Increase ceiling fans"
+                    className="w-9 h-9 rounded-lg bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] font-bold flex items-center justify-center"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-[#17191C] border border-[#25282D] rounded-xl">
+              <div className="flex items-center justify-between gap-3 p-3 bg-[#17191C] border border-[#25282D] rounded-xl">
                 <div>
                   <span className="font-semibold text-[#F2F0EA] block">LED Tube / Bulbs (15W each)</span>
                   <span className="text-[11px] text-[#8E959E]">{lights * 15} Watts total load</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => setLights(Math.max(0, lights - 1))}
-                    className="w-7 h-7 rounded bg-[#25282D] text-[#F2F0EA] font-bold"
+                    aria-label="Decrease LED bulbs"
+                    className="w-9 h-9 rounded-lg bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] font-bold flex items-center justify-center"
                   >
                     -
                   </button>
                   <span className="font-mono font-bold text-[#D6B98C] w-6 text-center">{lights}</span>
                   <button
                     onClick={() => setLights(lights + 1)}
-                    className="w-7 h-7 rounded bg-[#25282D] text-[#F2F0EA] font-bold"
+                    aria-label="Increase LED bulbs"
+                    className="w-9 h-9 rounded-lg bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] font-bold flex items-center justify-center"
                   >
                     +
                   </button>
@@ -183,13 +187,13 @@ export const BuyingGuidePage: React.FC = () => {
                 <span className="text-[10px] font-mono bg-[#25282D] text-[#D6B98C] px-2 py-0.5 rounded">
                   ENGINEERED FIT MATCH
                 </span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <img
                     src={matchedBattery.images[0]}
-                    alt=""
-                    className="w-16 h-16 object-cover rounded-lg bg-[#25282D]"
+                    alt={matchedBattery.name}
+                    className="w-16 h-16 object-cover rounded-lg bg-[#25282D] shrink-0"
                   />
-                  <div>
+                  <div className="min-w-0">
                     <h4 className="text-xs font-bold text-[#F2F0EA] line-clamp-1">
                       {matchedBattery.name}
                     </h4>

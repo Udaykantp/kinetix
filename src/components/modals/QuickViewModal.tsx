@@ -17,11 +17,11 @@ export const QuickViewModal: React.FC = () => {
   const inWish = isInWishlist(quickViewProduct.id);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl bg-[#101214] border border-[#25282D] rounded-2xl overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm">
+      <div className="relative w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-[#101214] border border-[#25282D] rounded-2xl shadow-2xl">
         <button
           onClick={() => setQuickViewProduct(null)}
-          className="absolute top-4 right-4 z-10 p-1.5 bg-[#17191C]/80 text-[#8E959E] hover:text-[#F2F0EA] rounded-lg"
+          className="absolute top-4 right-4 z-10 min-w-[36px] min-h-[36px] flex items-center justify-center bg-[#17191C]/90 text-[#B7BCC2] hover:text-[#F2F0EA] rounded-lg border border-[#343940]"
           aria-label="Close"
         >
           <X className="w-4 h-4" />
@@ -29,7 +29,7 @@ export const QuickViewModal: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2">
           {/* Image */}
-          <div className="relative aspect-square sm:aspect-auto bg-[#25282D]">
+          <div className="relative aspect-[4/3] sm:aspect-auto bg-[#25282D]">
             <img
               src={quickViewProduct.images[0]}
               alt={quickViewProduct.name}
@@ -93,13 +93,18 @@ export const QuickViewModal: React.FC = () => {
                   <span>Add to Cart</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => toggleWishlist(quickViewProduct)}
-                  className={`p-2.5 rounded-lg border border-[#343940] transition-colors ${
-                    inWish ? 'bg-[#A87555] text-white' : 'bg-[#17191C] text-[#B7BCC2]'
+                  aria-label={inWish ? 'Remove from Wishlist' : 'Save to Wishlist'}
+                  aria-pressed={inWish}
+                  title={inWish ? 'Remove from Wishlist' : 'Save to Wishlist'}
+                  className={`p-2.5 rounded-lg border transition-all active:scale-90 ${
+                    inWish
+                      ? 'bg-[#E11D48] border-[#E11D48] text-white'
+                      : 'bg-[#17191C] border-[#343940] text-[#B7BCC2] hover:text-[#E11D48]'
                   }`}
-                  aria-label="Wishlist"
                 >
-                  <Heart className="w-4 h-4 fill-current" />
+                  <Heart className={`w-4 h-4 ${inWish ? 'fill-current' : ''}`} />
                 </button>
               </div>
 

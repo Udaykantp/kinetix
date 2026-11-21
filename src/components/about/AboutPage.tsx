@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Award, Zap, Truck, Recycle, ArrowRight } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import industrialLabImg from '../../assets/images/category_banner_industrial_1794476151052.jpg';
 
 export const AboutPage: React.FC = () => {
   const { navigate } = useStore();
@@ -35,16 +36,16 @@ export const AboutPage: React.FC = () => {
             <p>
               KINETIX re-engineered the cell stack from the molecular level up. By pairing 100-bar HADI high-pressure spine casting with micro-porous borosilicate glass mats and Tier-1 Lithium Iron Phosphate prismatic cells, our battery units deliver triple the cyclic endurance of conventional flooded batteries.
             </p>
-            <div className="pt-2 flex items-center gap-6 font-mono text-xs text-[#D6B98C]">
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 font-mono text-xs text-[#D6B98C]">
               <div>
                 <span className="block text-2xl font-bold text-[#F2F0EA]">6,000+</span>
                 <span>Tested LiFePO4 Cycles</span>
               </div>
-              <div className="border-l border-[#25282D] pl-6">
+              <div className="border-t sm:border-t-0 sm:border-l border-[#25282D] pt-3 sm:pt-0 sm:pl-6">
                 <span className="block text-2xl font-bold text-[#F2F0EA]">45+</span>
                 <span>Metro Service Hubs</span>
               </div>
-              <div className="border-l border-[#25282D] pl-6">
+              <div className="border-t sm:border-t-0 sm:border-l border-[#25282D] pt-3 sm:pt-0 sm:pl-6">
                 <span className="block text-2xl font-bold text-[#F2F0EA]">120M</span>
                 <span>Warranty Coverage</span>
               </div>
@@ -53,19 +54,19 @@ export const AboutPage: React.FC = () => {
 
           <div className="relative rounded-2xl overflow-hidden border border-[#25282D] bg-[#101214]">
             <img
-              src="/src/assets/images/category_banner_industrial_1794476151052.jpg"
+              src={industrialLabImg}
               alt="KINETIX Advanced Energy Testing Facility"
-              className="w-full h-80 object-cover opacity-90"
+              className="w-full h-64 sm:h-80 object-cover opacity-90"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#101214] via-transparent to-transparent" />
-            <div className="absolute bottom-4 left-4 text-xs font-mono text-[#D6B98C]">
+            <div className="absolute bottom-4 left-4 right-4 text-xs font-mono text-[#D6B98C]">
               ISO 9001:2015 ACCREDITED TESTING LABORATORY
             </div>
           </div>
         </div>
 
         {/* 4 Pillars of Customer Trust */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-20">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
           <div className="bg-[#101214] border border-[#25282D] p-6 rounded-xl space-y-3">
             <div className="w-10 h-10 rounded-lg bg-[#25282D] flex items-center justify-center text-[#D6B98C]">
               <Truck className="w-5 h-5" />

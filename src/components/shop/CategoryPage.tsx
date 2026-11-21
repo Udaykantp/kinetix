@@ -70,8 +70,8 @@ export const CategoryPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Category Category Switcher Strip */}
-      <div className="bg-[#101214] border-b border-[#25282D] py-3 overflow-x-auto">
+      {/* Category Switcher Strip */}
+      <div className="bg-[#101214] border-b border-[#25282D] py-3 overflow-x-auto no-scrollbar">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-2">
           <span className="text-xs font-mono text-[#8E959E] uppercase mr-2 shrink-0">
             Segments:
@@ -103,13 +103,13 @@ export const CategoryPage: React.FC = () => {
 
       {/* Products Listing for this category */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-8">
           <h2 className="text-xl font-bold text-[#F2F0EA]">
             {meta.name} ({categoryProducts.length} Models)
           </h2>
           <button
             onClick={() => navigate('shop', { category: currentCategory })}
-            className="text-xs text-[#D6B98C] hover:text-[#E3CDA7] flex items-center gap-1 font-mono"
+            className="text-xs text-[#D6B98C] hover:text-[#E3CDA7] flex items-center gap-1 font-mono self-start sm:self-auto"
           >
             <span>Filter in Full Catalog</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -125,24 +125,38 @@ export const CategoryPage: React.FC = () => {
                 key={product.id}
                 className="group relative bg-[#101214] hover:bg-[#17191C] border border-[#25282D] hover:border-[#343940] rounded-xl overflow-hidden transition-all duration-200 flex flex-col justify-between"
               >
-                <div className="relative aspect-[4/3] bg-[#25282D] overflow-hidden">
+                <div
+                  onClick={() => navigate('product-detail', { productId: product.id })}
+                  className="relative aspect-[4/3] bg-[#25282D] overflow-hidden cursor-pointer"
+                >
                   <img
                     src={product.images[0]}
                     alt={product.name}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute top-3 right-3 flex flex-col gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-3 right-3 flex flex-col gap-1.5"
+                  >
                     <button
+                      type="button"
                       onClick={() => toggleWishlist(product)}
-                      className={`p-2 rounded-lg backdrop-blur-md transition-colors ${
-                        inWish ? 'bg-[#A87555] text-white' : 'bg-[#17191C]/80 text-[#B7BCC2]'
+                      aria-label={inWish ? `Remove ${product.name} from wishlist` : `Save ${product.name} to wishlist`}
+                      aria-pressed={inWish}
+                      title={inWish ? 'Remove from Wishlist' : 'Save to Wishlist'}
+                      className={`p-2 rounded-lg backdrop-blur-md transition-all active:scale-90 ${
+                        inWish
+                          ? 'bg-[#E11D48] text-white'
+                          : 'bg-[#17191C]/85 text-[#F2F0EA] hover:text-[#E11D48]'
                       }`}
                     >
-                      <Heart className="w-3.5 h-3.5 fill-current" />
+                      <Heart className={`w-3.5 h-3.5 ${inWish ? 'fill-current' : ''}`} />
                     </button>
                     <button
+                      type="button"
                       onClick={() => setQuickViewProduct(product)}
-                      className="p-2 rounded-lg bg-[#17191C]/80 backdrop-blur-md text-[#B7BCC2] hover:text-[#F2F0EA]"
+                      aria-label={`Quick view ${product.name}`}
+                      className="p-2 rounded-lg bg-[#17191C]/80 backdrop-blur-md text-[#B7BCC2] hover:text-[#F2F0EA] opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     >
                       <Eye className="w-3.5 h-3.5" />
                     </button>

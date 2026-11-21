@@ -1,4 +1,12 @@
 import { Product } from '../types';
+import carBatteryImg from '../assets/images/product_car_battery_1794476149763.jpg';
+import heroBatteryImg from '../assets/images/hero_battery_titanium_1794476148118.jpg';
+import bikeBatteryImg from '../assets/images/cat_bike_battery_1795185387964.jpg';
+import inverterBatteryImg from '../assets/images/product_inverter_battery_1794476149979.jpg';
+import solarBatteryImg from '../assets/images/cat_solar_battery_1795185352147.jpg';
+import lithiumBatteryImg from '../assets/images/product_lithium_solar_1794476150273.jpg';
+import industrialBatteryImg from '../assets/images/category_banner_industrial_1794476151052.jpg';
+import upsBatteryImg from '../assets/images/cat_ups_battery_1795185406017.jpg';
 
 export const INITIAL_PRODUCTS: Product[] = [
   // 1. CAR BATTERIES
@@ -14,10 +22,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 142,
     inStock: true,
     stockCount: 28,
-    images: [
-      '/src/assets/images/product_car_battery_1794476149763.jpg',
-      '/src/assets/images/hero_battery_titanium_1794476148118.jpg',
-    ],
+    images: [carBatteryImg, heroBatteryImg],
     capacityAh: 75,
     voltage: '12V',
     technology: 'Pure Lead AGM',
@@ -70,7 +75,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 98,
     inStock: true,
     stockCount: 19,
-    images: ['/src/assets/images/product_car_battery_1794476149763.jpg'],
+    images: [carBatteryImg],
     capacityAh: 65,
     voltage: '12V',
     technology: 'Heavy Cast Lead-Acid',
@@ -111,7 +116,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 84,
     inStock: true,
     stockCount: 35,
-    images: ['/src/assets/images/product_car_battery_1794476149763.jpg'],
+    images: [carBatteryImg],
     capacityAh: 45,
     voltage: '12V',
     technology: 'Heavy Cast Lead-Acid',
@@ -148,7 +153,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 64,
     inStock: true,
     stockCount: 42,
-    images: ['/src/assets/images/product_car_battery_1794476149763.jpg'],
+    images: [bikeBatteryImg],
     capacityAh: 9,
     voltage: '12V',
     technology: 'LiFePO4 Lithium',
@@ -192,7 +197,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 110,
     inStock: true,
     stockCount: 60,
-    images: ['/src/assets/images/product_car_battery_1794476149763.jpg'],
+    images: [bikeBatteryImg],
     capacityAh: 5,
     voltage: '12V',
     technology: 'Gel VRLA',
@@ -224,10 +229,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 310,
     inStock: true,
     stockCount: 15,
-    images: [
-      '/src/assets/images/product_inverter_battery_1794476149979.jpg',
-      '/src/assets/images/hero_battery_titanium_1794476148118.jpg',
-    ],
+    images: [inverterBatteryImg, heroBatteryImg],
     capacityAh: 220,
     voltage: '12V',
     technology: 'Tall Tubular',
@@ -274,7 +276,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 220,
     inStock: true,
     stockCount: 24,
-    images: ['/src/assets/images/product_inverter_battery_1794476149979.jpg'],
+    images: [inverterBatteryImg],
     capacityAh: 150,
     voltage: '12V',
     technology: 'Tall Tubular',
@@ -293,6 +295,76 @@ export const INITIAL_PRODUCTS: Product[] = [
     },
     isBestSeller: true,
   },
+  {
+    id: 'livguard-invatuff-160',
+    name: 'Livguard Invatuff IT1660TT 160Ah Tall Tubular',
+    brand: 'Livguard',
+    category: 'inverter',
+    price: 13850,
+    originalPrice: 17200,
+    discountPercent: 19,
+    rating: 4.8,
+    reviewCount: 164,
+    inStock: true,
+    stockCount: 22,
+    images: [inverterBatteryImg],
+    capacityAh: 160,
+    voltage: '12V',
+    technology: 'Tall Tubular',
+    warrantyMonths: 60,
+    dimensions: '503 × 190 × 412 mm',
+    weightKg: 56.4,
+    cycleLife: '1,600 deep cycles',
+    compatibleAppliances: ['2-3 BHK Home', 'Ceiling Fans, LED Lights, Wi-Fi, TV, Fridge'],
+    description:
+      'Built with 3D grid alloy and extra-thick tubular plates to deliver up to 25% higher backup duration in regions with frequent power cuts.',
+    highlights: [
+      '3D grid design enhances active mass retention and charge acceptance',
+      'Ultra-low water loss with ceramic vent plugs',
+      'Backed by 60-month nationwide doorstep warranty',
+    ],
+    technicalSpecs: {
+      'Voltage': '12V',
+      'Capacity': '160 Ah',
+      'Warranty': '36 Months Replacement + 24 Months Pro-rata',
+    },
+    isNewArrival: true,
+  },
+  {
+    id: 'vguard-vj165-165',
+    name: 'V-Guard VJ165 High-Backup 165Ah Tall Tubular',
+    brand: 'V-Guard',
+    category: 'inverter',
+    price: 14299,
+    originalPrice: 17900,
+    discountPercent: 20,
+    rating: 4.8,
+    reviewCount: 129,
+    inStock: true,
+    stockCount: 18,
+    images: [solarBatteryImg],
+    capacityAh: 165,
+    voltage: '12V',
+    technology: 'Tall Tubular',
+    warrantyMonths: 66,
+    dimensions: '504 × 190 × 415 mm',
+    weightKg: 58.0,
+    cycleLife: '1,700 cycles @ 80% DoD',
+    compatibleAppliances: ['3 BHK Residence', 'Home Office', 'Small Retail'],
+    description:
+      'Engineered with high-pressure cast spines and corrosion-resistant selenium alloy for dependable deep-cycle home and solar hybrid backup.',
+    highlights: [
+      'High-pressure cast spines resist extreme Indian summer heat',
+      'Fast recharge profile ideal for daily outage schedules',
+      '66-month comprehensive manufacturer service network',
+    ],
+    technicalSpecs: {
+      'Voltage': '12V',
+      'Capacity': '165 Ah',
+      'Warranty': '42 Months Replacement + 24 Months Pro-rata',
+    },
+    isFeatured: true,
+  },
 
   // 4. LITHIUM-ION BATTERIES
   {
@@ -307,10 +379,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 47,
     inStock: true,
     stockCount: 8,
-    images: [
-      '/src/assets/images/product_lithium_solar_1794476150273.jpg',
-      '/src/assets/images/hero_battery_titanium_1794476148118.jpg',
-    ],
+    images: [lithiumBatteryImg, heroBatteryImg],
     capacityAh: 100,
     voltage: '51.2V',
     technology: 'LiFePO4 Lithium',
@@ -356,7 +425,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 39,
     inStock: true,
     stockCount: 14,
-    images: ['/src/assets/images/product_lithium_solar_1794476150273.jpg'],
+    images: [lithiumBatteryImg],
     capacityAh: 100,
     voltage: '25.6V',
     technology: 'LiFePO4 Lithium',
@@ -394,7 +463,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 88,
     inStock: true,
     stockCount: 16,
-    images: ['/src/assets/images/product_inverter_battery_1794476149979.jpg'],
+    images: [solarBatteryImg],
     capacityAh: 200,
     voltage: '12V',
     technology: 'Tall Tubular',
@@ -431,10 +500,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 18,
     inStock: true,
     stockCount: 5,
-    images: [
-      '/src/assets/images/category_banner_industrial_1794476151052.jpg',
-      '/src/assets/images/hero_battery_titanium_1794476148118.jpg',
-    ],
+    images: [industrialBatteryImg, heroBatteryImg],
     capacityAh: 200,
     voltage: '48V',
     technology: 'LiFePO4 Lithium',
@@ -469,7 +535,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 33,
     inStock: true,
     stockCount: 22,
-    images: ['/src/assets/images/category_banner_industrial_1794476151052.jpg'],
+    images: [industrialBatteryImg],
     capacityAh: 100,
     voltage: '12V',
     technology: 'Pure Lead AGM',
@@ -500,7 +566,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 76,
     inStock: true,
     stockCount: 50,
-    images: ['/src/assets/images/product_car_battery_1794476149763.jpg'],
+    images: [upsBatteryImg],
     capacityAh: 7.2,
     voltage: '12V',
     technology: 'Gel VRLA',
@@ -529,7 +595,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 41,
     inStock: true,
     stockCount: 18,
-    images: ['/src/assets/images/product_car_battery_1794476149763.jpg'],
+    images: [upsBatteryImg],
     capacityAh: 26,
     voltage: '12V',
     technology: 'Pure Lead AGM',
@@ -560,7 +626,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 180,
     inStock: true,
     stockCount: 45,
-    images: ['/src/assets/images/hero_battery_titanium_1794476148118.jpg'],
+    images: [heroBatteryImg],
     capacityAh: 0,
     voltage: '12V / 24V Auto',
     technology: 'Pure Lead AGM',
@@ -596,7 +662,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviewCount: 95,
     inStock: true,
     stockCount: 65,
-    images: ['/src/assets/images/hero_battery_titanium_1794476148118.jpg'],
+    images: [heroBatteryImg],
     capacityAh: 0,
     voltage: 'All DC Systems',
     technology: 'Pure Lead AGM',
@@ -629,7 +695,7 @@ export const CATEGORY_METADATA: Record<
     name: 'Car Batteries',
     description:
       'High-cranking AGM and Silver-Alloy batteries engineered for luxury cars, premium SUVs, and start-stop vehicles.',
-    bannerImage: '/src/assets/images/product_car_battery_1794476149763.jpg',
+    bannerImage: carBatteryImg,
     headline: 'Instant Ignition. Unyielding Cranking Current.',
     buyingTip:
       'Match your car’s recommended Cold Cranking Amps (CCA) and DIN terminal layout. Cars with auto Start-Stop need an AGM battery for cyclic durability.',
@@ -648,7 +714,7 @@ export const CATEGORY_METADATA: Record<
     name: 'Bike Batteries',
     description:
       'Vibration-resistant Gel VRLA and ultra-lightweight Lithium LiFePO4 batteries for commuter bikes, cruisers, and superbikes.',
-    bannerImage: '/src/assets/images/product_car_battery_1794476149763.jpg',
+    bannerImage: bikeBatteryImg,
     headline: 'Zero-Maintenance Power for Two Wheels.',
     buyingTip:
       'Check whether your bike requires a 2.5Ah, 5Ah, or 9Ah battery and check terminal polarity before purchasing.',
@@ -663,7 +729,7 @@ export const CATEGORY_METADATA: Record<
     name: 'Inverter Batteries',
     description:
       'Heavy-duty Tall Tubular and Flat Plate batteries designed for extreme heat, deep discharges, and extended blackouts.',
-    bannerImage: '/src/assets/images/product_inverter_battery_1794476149979.jpg',
+    bannerImage: inverterBatteryImg,
     headline: 'Continuous Unbroken Home & Office Backup.',
     buyingTip:
       'For a 2BHK home with 3 fans, 4 lights, and a TV (approx 400W load) running for 4 hours, select at least a 150Ah or 220Ah tall tubular battery.',
@@ -678,7 +744,7 @@ export const CATEGORY_METADATA: Record<
     name: 'Lithium-Ion Batteries',
     description:
       'Aerospace grade LiFePO4 energy storage packs with integrated smart BMS, 6,000+ cycle life, and zero maintenance.',
-    bannerImage: '/src/assets/images/product_lithium_solar_1794476150273.jpg',
+    bannerImage: lithiumBatteryImg,
     headline: 'The Next Generation of Clean Energy Storage.',
     buyingTip:
       'Lithium LiFePO4 provides 90% usable capacity and charges in 2 hours compared to 10 hours for lead-acid batteries.',
@@ -693,7 +759,7 @@ export const CATEGORY_METADATA: Record<
     name: 'Solar Batteries',
     description:
       'C10 rated deep-discharge solar tubular and lithium storage systems engineered for daily photovoltaic cycling.',
-    bannerImage: '/src/assets/images/product_inverter_battery_1794476149979.jpg',
+    bannerImage: solarBatteryImg,
     headline: 'Harvest Daylight. Power the Night.',
     buyingTip:
       'Always look for C10 rated batteries rather than C20 for solar applications to ensure high charge absorption even during cloudy periods.',
@@ -708,7 +774,7 @@ export const CATEGORY_METADATA: Record<
     name: 'Industrial Batteries',
     description:
       'High-voltage telecom, data-center, and substation energy racks built for uncompromising reliability.',
-    bannerImage: '/src/assets/images/category_banner_industrial_1794476151052.jpg',
+    bannerImage: industrialBatteryImg,
     headline: 'Mission-Critical Energy Infrastructure.',
     buyingTip:
       'Consult our engineering specialists for custom rack layouts, SNMP network telematics, and centralized fire-protection integrations.',
@@ -723,7 +789,7 @@ export const CATEGORY_METADATA: Record<
     name: 'UPS Batteries',
     description:
       'Fast high-rate discharge AGM and Gel batteries for desktop UPS, medical instrumentation, and server rooms.',
-    bannerImage: '/src/assets/images/product_car_battery_1794476149763.jpg',
+    bannerImage: upsBatteryImg,
     headline: 'Zero-Millisecond Power Transition.',
     buyingTip:
       'Replace all batteries in an online UPS string at the same time to prevent unbalanced cell impedance.',
@@ -738,7 +804,7 @@ export const CATEGORY_METADATA: Record<
     name: 'Battery Accessories',
     description:
       'Microprocessor smart desulfating chargers, oxygen-free copper cables, hydrometers, and battery health testers.',
-    bannerImage: '/src/assets/images/hero_battery_titanium_1794476148118.jpg',
+    bannerImage: heroBatteryImg,
     headline: 'Precision Accessories for Peak Endurance.',
     buyingTip:
       'Use 35 sq.mm pure copper cables to eliminate heat loss between inverters and high-capacity battery banks.',

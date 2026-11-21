@@ -1,4 +1,7 @@
 import { BlogPost } from '../types';
+import lithiumSolarImg from '../assets/images/product_lithium_solar_1794476150273.jpg';
+import carBatteryImg from '../assets/images/product_car_battery_1794476149763.jpg';
+import inverterBatteryImg from '../assets/images/product_inverter_battery_1794476149979.jpg';
 
 export const BLOG_POSTS: BlogPost[] = [
   {
@@ -7,7 +10,7 @@ export const BLOG_POSTS: BlogPost[] = [
     title: 'LiFePO4 vs Tall Tubular Lead-Acid: The Definitive 2026 Energy Storage Comparison',
     excerpt:
       'A deep technical breakdown comparing cycle life, round-trip efficiency, total cost of ownership, and thermal safety between lithium iron phosphate and conventional tubular batteries.',
-    coverImage: '/src/assets/images/product_lithium_solar_1794476150273.jpg',
+    coverImage: lithiumSolarImg,
     category: 'Engineering & Chemistry',
     author: 'Dr. Arindam Sen, Battery Systems Architect',
     date: 'February 18, 2026',
@@ -35,7 +38,7 @@ While the upfront acquisition cost of a 5kWh lithium battery is approximately 2.
     title: 'Why Start-Stop Vehicles Demand Absorbent Glass Mat (AGM) Batteries',
     excerpt:
       'Understanding micro-hybrid electrical demands, alternator smart recuperation, and why fitting a standard flooded battery in an AGM-specified vehicle causes premature failure.',
-    coverImage: '/src/assets/images/product_car_battery_1794476149763.jpg',
+    coverImage: carBatteryImg,
     category: 'Automotive Technology',
     author: 'Vikramaditya Sharma, Automotive Systems Lead',
     date: 'January 28, 2026',
@@ -64,7 +67,7 @@ Always verify your car battery compartment before replacement. If your original 
     title: 'The Ultimate Inverter Battery Maintenance Checklist for Peak Summer Performance',
     excerpt:
       'Five critical preventative maintenance steps to ensure your tubular battery delivers full backup without sulfation or voltage drop during severe heatwaves.',
-    coverImage: '/src/assets/images/product_inverter_battery_1794476149979.jpg',
+    coverImage: inverterBatteryImg,
     category: 'Maintenance & Care',
     author: 'Sunil Rao, Chief Field Engineer',
     date: 'February 05, 2026',

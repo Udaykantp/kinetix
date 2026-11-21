@@ -21,7 +21,7 @@ export const BlogListPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {BLOG_POSTS.map((post) => (
             <div
               key={post.id}
@@ -76,7 +76,7 @@ export const BlogDetailPage: React.FC = () => {
   return (
     <div className="bg-[#17191C] min-h-screen py-16 border-b border-[#25282D]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2 text-xs text-[#8E959E] font-mono mb-6">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[#8E959E] font-mono mb-6">
           <button onClick={() => navigate('home')} className="hover:text-[#F2F0EA]">
             Home
           </button>
@@ -85,7 +85,7 @@ export const BlogDetailPage: React.FC = () => {
             Articles
           </button>
           <span>/</span>
-          <span className="text-[#D6B98C] truncate max-w-xs">{post.title}</span>
+          <span className="text-[#D6B98C] truncate max-w-[200px] sm:max-w-xs">{post.title}</span>
         </div>
 
         <div className="space-y-4 mb-8">
@@ -137,16 +137,16 @@ export const BlogDetailPage: React.FC = () => {
             })}
           </div>
 
-          <div className="pt-8 border-t border-[#25282D] flex items-center justify-between">
+          <div className="pt-8 border-t border-[#25282D] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <button
               onClick={() => navigate('blog')}
-              className="px-4 py-2 bg-[#25282D] text-xs font-semibold text-[#F2F0EA] rounded-lg"
+              className="min-h-[42px] px-4 py-2 bg-[#25282D] text-xs font-semibold text-[#F2F0EA] rounded-lg text-center"
             >
               ← Back to All Articles
             </button>
             <button
               onClick={() => navigate('shop')}
-              className="px-4 py-2 bg-[#D6B98C] text-xs font-semibold text-[#17191C] rounded-lg"
+              className="min-h-[42px] px-4 py-2 bg-[#D6B98C] text-xs font-semibold text-[#17191C] rounded-lg text-center"
             >
               Shop Batteries Featured Here
             </button>

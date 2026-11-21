@@ -1,8 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  ShieldCheck,
   CheckCircle2,
-  Truck,
   CreditCard,
   QrCode,
   Building,
@@ -10,9 +8,11 @@ import {
   ArrowRight,
   MapPin,
   Lock,
-  Download,
   Check,
-  AlertCircle,
+  User as UserIcon,
+  Plus,
+  CloudUpload,
+  Loader2,
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { Address, Order } from '../../types';
@@ -27,19 +27,29 @@ export const CheckoutPage: React.FC = () => {
     cartTotal,
     appliedCoupon,
     user,
+    signInWithGoogle,
     placeOrder,
+    linkGuestOrderToAccount,
     checkPincode,
     showToast,
     navigate,
   } = useStore();
 
-  // If cart is empty and no confirmed order yet, redirect or show message
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+  const [orderLinked, setOrderLinked] = useState(false);
+  const [linkingOrder, setLinkingOrder] = useState(false);
 
-  // Steps: 1. Address, 2. Delivery Options, 3. Payment
+  // Steps: 1. Address, 3. Payment
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  // Address State
+  // Saved address selection vs custom new address
+  const [selectedAddressId, setSelectedAddressId] = useState<string | 'new'>(
+    user?.addresses[0]?.id || 'new'
+  );
+  const [saveAddressToProfile, setSaveAddressToProfile] = useState<boolean>(true);
+  const [addressLabel, setAddressLabel] = useState<'Home' | 'Work' | 'Other'>('Home');
+
+  // Address Form State
   const defaultAddr = user?.addresses[0];
   const [fullName, setFullName] = useState(defaultAddr?.fullName || user?.name || '');
   const [phone, setPhone] = useState(defaultAddr?.phone || user?.phone || '');
@@ -50,12 +60,36 @@ export const CheckoutPage: React.FC = () => {
   const [state, setState] = useState(defaultAddr?.state || 'Maharashtra');
   const [pinCode, setPinCode] = useState(defaultAddr?.pinCode || '400050');
 
+  // Auto-hydrate fields when a user signs in or saved addresses load from Firestore
+  useEffect(() => {
+    if (!user) return;
+    if (user.addresses.length > 0 && selectedAddressId === 'new' && !addressLine1) {
+      const primary = user.addresses.find((a) => a.isDefault) || user.addresses[0];
+      if (primary) {
+        setSelectedAddressId(primary.id || 'new');
+        setFullName(primary.fullName);
+        setPhone(primary.phone);
+        setEmail(primary.email || user.email);
+        setAddressLine1(primary.addressLine1);
+        setAddressLine2(primary.addressLine2 || '');
+        setCity(primary.city);
+        setState(primary.state);
+        setPinCode(primary.pinCode);
+        return;
+      }
+    }
+    if (!fullName && user.name) setFullName(user.name);
+    if (!phone && user.phone) setPhone(user.phone);
+    if (!email && user.email) setEmail(user.email);
+  }, [user?.id, user?.addresses.length]);
+
   // Delivery Speed
   const [deliverySpeed, setDeliverySpeed] = useState<'express' | 'standard'>('express');
-  const [scrapExchange, setScrapExchange] = useState(true);
 
   // Payment Method
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery'>('UPI');
+  const [paymentMethod, setPaymentMethod] = useState<
+    'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery'
+  >('UPI');
   const [upiId, setUpiId] = useState('user@okhdfcbank');
   const [cardNumber, setCardNumber] = useState('4532 •••• •••• 8821');
   const [cardExpiry, setCardExpiry] = useState('08/29');
@@ -63,8 +97,29 @@ export const CheckoutPage: React.FC = () => {
   const [selectedBank, setSelectedBank] = useState('HDFC Bank');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Pin validation
-  const pinDetails = checkPincode(pinCode);
+  const handleSelectSavedAddress = (addr: Address) => {
+    setSelectedAddressId(addr.id || 'new');
+    setFullName(addr.fullName);
+    setPhone(addr.phone);
+    setEmail(addr.email || user?.email || '');
+    setAddressLine1(addr.addressLine1);
+    setAddressLine2(addr.addressLine2 || '');
+    setCity(addr.city);
+    setState(addr.state);
+    setPinCode(addr.pinCode);
+  };
+
+  const handleUseNewAddress = () => {
+    setSelectedAddressId('new');
+    setFullName(user?.name || '');
+    setPhone(user?.phone || '');
+    setEmail(user?.email || '');
+    setAddressLine1('');
+    setAddressLine2('');
+    setCity('');
+    setState('');
+    setPinCode('');
+  };
 
   const handlePincodeChange = (val: string) => {
     setPinCode(val);
@@ -79,37 +134,70 @@ export const CheckoutPage: React.FC = () => {
 
   const handleProceedToPayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !phone || !email || !addressLine1 || !pinCode) {
+    if (!fullName.trim() || !phone.trim() || !email.trim() || !addressLine1.trim() || !pinCode.trim()) {
       showToast('Please fill all mandatory shipping fields.', 'error');
+      return;
+    }
+    if (phone.trim().length < 6) {
+      showToast('Please enter a valid mobile number.', 'error');
       return;
     }
     setStep(3);
   };
 
-  const handleFinalOrderSubmit = () => {
+  const handleFinalOrderSubmit = async () => {
     setIsProcessing(true);
-
-    setTimeout(() => {
+    try {
       const shippingAddress: Address = {
-        fullName,
-        phone,
-        email,
-        addressLine1,
-        addressLine2,
-        city,
-        state,
-        pinCode,
+        id: selectedAddressId !== 'new' ? selectedAddressId : undefined,
+        label: addressLabel,
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        addressLine1: addressLine1.trim(),
+        addressLine2: addressLine2.trim(),
+        city: city.trim() || 'Mumbai',
+        state: state.trim() || 'Maharashtra',
+        pinCode: pinCode.trim(),
       };
 
-      const order = placeOrder({
+      const order = await placeOrder({
         shippingAddress,
         paymentMethod,
         deliverySpeed,
+        saveAddressToProfile: Boolean(user && selectedAddressId === 'new' && saveAddressToProfile),
       });
 
-      setIsProcessing(false);
       setConfirmedOrder(order);
-    }, 1200);
+      setOrderLinked(Boolean(order.userId));
+    } catch (error) {
+      console.error('Order placement failed:', error);
+      showToast('Could not complete your order. Please try again.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleLinkGuestOrderWithGoogle = async () => {
+    if (!confirmedOrder) return;
+    setLinkingOrder(true);
+    try {
+      let signedIn = Boolean(user);
+      if (!signedIn) {
+        signedIn = await signInWithGoogle({
+          name: confirmedOrder.shippingAddress.fullName,
+          phone: confirmedOrder.shippingAddress.phone,
+        });
+      }
+      if (signedIn) {
+        const linked = await linkGuestOrderToAccount(confirmedOrder);
+        if (linked) {
+          setOrderLinked(true);
+        }
+      }
+    } finally {
+      setLinkingOrder(false);
+    }
   };
 
   // If order placed, show Confirmation Receipt View
@@ -138,33 +226,60 @@ export const CheckoutPage: React.FC = () => {
             </div>
 
             {/* Receipt Summary Box */}
-            <div className="bg-[#17191C] border border-[#25282D] rounded-xl p-6 text-left text-xs space-y-3">
-              <div className="flex justify-between border-b border-[#25282D] pb-3">
-                <span className="text-[#8E959E]">Carrier & Delivery Mode</span>
-                <span className="text-[#F2F0EA] font-semibold">
-                  {confirmedOrder.carrier} (Within 4 Hours)
+            <div className="bg-[#17191C] border border-[#25282D] rounded-xl p-5 sm:p-6 text-left text-xs space-y-3">
+              <div className="flex justify-between gap-4 border-b border-[#25282D] pb-3">
+                <span className="text-[#8E959E] shrink-0">Carrier & Delivery Mode</span>
+                <span className="text-[#F2F0EA] font-semibold text-right">
+                  {confirmedOrder.carrier} ({confirmedOrder.estimatedDelivery})
                 </span>
               </div>
-              <div className="flex justify-between border-b border-[#25282D] pb-3">
-                <span className="text-[#8E959E]">Shipping Address</span>
+              <div className="flex justify-between gap-4 border-b border-[#25282D] pb-3">
+                <span className="text-[#8E959E] shrink-0">Shipping Address</span>
                 <span className="text-[#F2F0EA] font-semibold text-right max-w-xs">
-                  {confirmedOrder.shippingAddress.addressLine1}, {confirmedOrder.shippingAddress.city} -{' '}
-                  {confirmedOrder.shippingAddress.pinCode}
+                  {confirmedOrder.shippingAddress.addressLine1}, {confirmedOrder.shippingAddress.city}{' '}
+                  - {confirmedOrder.shippingAddress.pinCode}
                 </span>
               </div>
-              <div className="flex justify-between border-b border-[#25282D] pb-3">
-                <span className="text-[#8E959E]">Payment Method & Status</span>
-                <span className="text-[#D6B98C] font-semibold">
+              <div className="flex justify-between gap-4 border-b border-[#25282D] pb-3">
+                <span className="text-[#8E959E] shrink-0">Payment Method & Status</span>
+                <span className="text-[#D6B98C] font-semibold text-right">
                   {confirmedOrder.paymentMethod} · {confirmedOrder.paymentStatus}
                 </span>
               </div>
-              <div className="flex justify-between pt-1 text-sm font-bold text-[#F2F0EA]">
-                <span>Total Amount Paid</span>
+              <div className="flex justify-between gap-4 pt-1 text-sm font-bold text-[#F2F0EA]">
+                <span>Total Amount</span>
                 <span className="text-[#D6B98C] font-mono">
                   ₹{confirmedOrder.total.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
+
+            {/* Guest-to-Account Save Prompt */}
+            {!orderLinked && (
+              <div className="bg-[#17191C] border border-[#D6B98C]/35 rounded-xl p-4 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs">
+                  <div className="font-semibold text-[#F2F0EA]">
+                    Save this order & digital warranty permanently
+                  </div>
+                  <p className="text-[#8E959E] text-[11px] mt-0.5">
+                    Sign in with Google in 1 click to track, cancel, or claim warranty from any device.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={linkingOrder}
+                  onClick={handleLinkGuestOrderWithGoogle}
+                  className="px-4 py-2.5 bg-[#D6B98C] hover:bg-[#E3CDA7] disabled:opacity-60 text-[#17191C] font-semibold text-xs rounded-lg flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  {linkingOrder ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CloudUpload className="w-3.5 h-3.5" />
+                  )}
+                  <span>{linkingOrder ? 'Saving...' : 'Sign In & Save Order'}</span>
+                </button>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
@@ -207,49 +322,144 @@ export const CheckoutPage: React.FC = () => {
     <div className="bg-[#17191C] min-h-screen py-10 border-b border-[#25282D]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-6 mb-10 text-xs font-mono">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mb-8 sm:mb-10 text-xs font-mono">
           <div
             onClick={() => setStep(1)}
             className={`flex items-center gap-2 cursor-pointer ${
               step >= 1 ? 'text-[#D6B98C]' : 'text-[#8E959E]'
             }`}
           >
-            <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-[11px] font-bold">
+            <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-[11px] font-bold shrink-0">
               1
             </span>
             <span>Delivery Address</span>
           </div>
-          <span className="text-[#343940]">——</span>
+          <span className="text-[#343940] hidden sm:inline">——</span>
           <div
-            onClick={() => setStep(3)}
+            onClick={() => {
+              if (fullName && phone && email && addressLine1 && pinCode) setStep(3);
+            }}
             className={`flex items-center gap-2 cursor-pointer ${
               step >= 3 ? 'text-[#D6B98C]' : 'text-[#8E959E]'
             }`}
           >
-            <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-[11px] font-bold">
+            <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-[11px] font-bold shrink-0">
               2
             </span>
             <span>Payment & Verification</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
           {/* Main Checkout Form Left */}
           <div className="lg:col-span-7 space-y-6">
+            {/* Flipkart-style Account Status Bar inside KINETIX UI */}
+            <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-[#25282D] border border-[#343940] flex items-center justify-center text-[#D6B98C] shrink-0">
+                  <UserIcon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 text-xs">
+                  {user ? (
+                    <>
+                      <div className="text-[#D6B98C] font-mono text-[10px] uppercase">
+                        Verified Account Signed In
+                      </div>
+                      <div className="text-[#F2F0EA] font-semibold truncate">
+                        {user.name} · <span className="text-[#8E959E] font-normal">{user.email}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-[#F2F0EA] font-semibold">
+                        Ordering as Guest — Anyone Can Checkout Immediately
+                      </div>
+                      <div className="text-[#8E959E] text-[11px]">
+                        Or sign in with Google to use saved addresses & sync order history.
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {!user && (
+                <button
+                  type="button"
+                  onClick={() => signInWithGoogle()}
+                  className="px-4 py-2 bg-[#25282D] hover:bg-[#343940] text-[#D6B98C] border border-[#D6B98C]/40 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors"
+                >
+                  Sign In with Google
+                </button>
+              )}
+            </div>
+
             {step === 1 ? (
               <form
                 onSubmit={handleProceedToPayment}
-                className="bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8 space-y-6"
+                className="bg-[#101214] border border-[#25282D] rounded-2xl p-5 sm:p-8 space-y-6"
               >
-                <div className="flex items-center justify-between pb-4 border-b border-[#25282D]">
-                  <h2 className="text-lg font-bold text-[#F2F0EA] flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#D6B98C]" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#25282D]">
+                  <h2 className="text-base sm:text-lg font-bold text-[#F2F0EA] flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-[#D6B98C] shrink-0" />
                     <span>Doorstep Shipping & Fitment Address</span>
                   </h2>
-                  <span className="text-xs text-[#8E959E] font-mono">
-                    {user ? `Logged in as ${user.email}` : 'Guest Checkout'}
+                  <span className="text-xs text-[#8E959E] font-mono break-all sm:break-normal">
+                    {user ? `${user.addresses.length} Saved` : 'Express Guest Checkout'}
                   </span>
                 </div>
+
+                {/* Saved Address Quick Selector for Signed-In Users */}
+                {user && user.addresses.length > 0 && (
+                  <div className="space-y-2.5">
+                    <div className="text-[10px] font-mono uppercase text-[#8E959E]">
+                      Select a Saved Delivery Address
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {user.addresses.map((addr) => {
+                        const isSelected = selectedAddressId === addr.id;
+                        return (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => handleSelectSavedAddress(addr)}
+                            className={`text-left p-3.5 rounded-xl border transition-colors ${
+                              isSelected
+                                ? 'bg-[#17191C] border-[#D6B98C] text-[#F2F0EA]'
+                                : 'bg-[#17191C]/50 border-[#25282D] text-[#8E959E] hover:border-[#343940]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="font-bold text-[#F2F0EA] truncate">
+                                {addr.fullName}
+                              </span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#25282D] text-[#D6B98C]">
+                                {addr.label || 'Home'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#B7BCC2] line-clamp-2">
+                              {addr.addressLine1}, {addr.city} - {addr.pinCode}
+                            </p>
+                            <p className="text-[10px] text-[#8E959E] mt-1 font-mono">
+                              {addr.phone}
+                            </p>
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={handleUseNewAddress}
+                        className={`p-3.5 rounded-xl border border-dashed flex items-center justify-center gap-2 text-xs font-semibold transition-colors ${
+                          selectedAddressId === 'new'
+                            ? 'bg-[#17191C] border-[#D6B98C] text-[#D6B98C]'
+                            : 'bg-[#17191C]/30 border-[#343940] text-[#8E959E] hover:text-[#F2F0EA]'
+                        }`}
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Deliver to a New Address</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
@@ -338,7 +548,7 @@ export const CheckoutPage: React.FC = () => {
 
                   <div>
                     <label className="block text-[#8E959E] uppercase font-mono text-[10px] mb-1">
-                      City
+                      City *
                     </label>
                     <input
                       type="text"
@@ -351,7 +561,7 @@ export const CheckoutPage: React.FC = () => {
 
                   <div>
                     <label className="block text-[#8E959E] uppercase font-mono text-[10px] mb-1">
-                      State
+                      State *
                     </label>
                     <input
                       type="text"
@@ -362,6 +572,39 @@ export const CheckoutPage: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                {/* Save Address Checkbox for Signed-In Users adding a New Address */}
+                {user && selectedAddressId === 'new' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#17191C] border border-[#25282D] rounded-xl p-3 text-xs">
+                    <label className="flex items-center gap-2 text-[#B7BCC2] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAddressToProfile}
+                        onChange={(e) => setSaveAddressToProfile(e.target.checked)}
+                        className="accent-[#D6B98C]"
+                      />
+                      <span>Save this address to my profile for future orders</span>
+                    </label>
+                    {saveAddressToProfile && (
+                      <div className="flex items-center gap-1.5">
+                        {(['Home', 'Work', 'Other'] as const).map((lbl) => (
+                          <button
+                            key={lbl}
+                            type="button"
+                            onClick={() => setAddressLabel(lbl)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                              addressLabel === lbl
+                                ? 'bg-[#25282D] border-[#D6B98C] text-[#D6B98C]'
+                                : 'border-[#343940] text-[#8E959E]'
+                            }`}
+                          >
+                            {lbl}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Delivery Preference */}
                 <div className="pt-4 border-t border-[#25282D]">
@@ -415,15 +658,15 @@ export const CheckoutPage: React.FC = () => {
               </form>
             ) : (
               /* Step 3: Payment Selection */
-              <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8 space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-[#25282D]">
-                  <h2 className="text-lg font-bold text-[#F2F0EA] flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-[#D6B98C]" />
+              <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-5 sm:p-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#25282D]">
+                  <h2 className="text-base sm:text-lg font-bold text-[#F2F0EA] flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-[#D6B98C] shrink-0" />
                     <span>Select Payment Architecture</span>
                   </h2>
                   <button
                     onClick={() => setStep(1)}
-                    className="text-xs text-[#D6B98C] hover:text-[#E3CDA7] font-mono"
+                    className="text-xs text-[#D6B98C] hover:text-[#E3CDA7] font-mono self-start sm:self-auto"
                   >
                     Edit Shipping Address
                   </button>
@@ -461,7 +704,6 @@ export const CheckoutPage: React.FC = () => {
                   {paymentMethod === 'UPI' && (
                     <div className="space-y-4 text-xs">
                       <div className="flex flex-col sm:flex-row items-center gap-6">
-                        {/* Dynamic UPI QR Code Canvas/SVG */}
                         <div className="w-36 h-36 bg-white p-2 rounded-lg flex items-center justify-center shrink-0">
                           <div className="w-full h-full border-2 border-black p-1 flex flex-col justify-between items-center text-black font-mono text-[9px] text-center">
                             <div className="w-full flex justify-between font-bold">
@@ -582,7 +824,10 @@ export const CheckoutPage: React.FC = () => {
                   className="w-full py-4 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-semibold text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xl disabled:opacity-50"
                 >
                   {isProcessing ? (
-                    <span>Securing Direct Manufacturer Order...</span>
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Securing Direct Manufacturer Order...</span>
+                    </>
                   ) : (
                     <>
                       <span>
@@ -611,15 +856,13 @@ export const CheckoutPage: React.FC = () => {
                     className="w-12 h-12 object-cover rounded bg-[#25282D] shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-[#F2F0EA] truncate">
-                      {item.product.name}
-                    </h4>
+                    <h4 className="font-semibold text-[#F2F0EA] truncate">{item.product.name}</h4>
                     <span className="text-[#8E959E] font-mono">
                       Qty: {item.quantity} · {item.product.voltage}
                     </span>
                   </div>
                   <div className="text-right font-mono text-[#D6B98C] font-semibold">
-                    ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                    ₹{((item.unitPrice ?? item.product.price) * item.quantity).toLocaleString('en-IN')}
                   </div>
                 </div>
               ))}

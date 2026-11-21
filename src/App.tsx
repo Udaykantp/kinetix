@@ -1,5 +1,6 @@
 import React from 'react';
 import { StoreProvider, useStore } from './context/StoreContext';
+import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { AnnouncementBar } from './components/layout/AnnouncementBar';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
@@ -12,6 +13,15 @@ import { QuickViewModal } from './components/modals/QuickViewModal';
 import { HomePage } from './components/home/HomePage';
 import { ShopPage } from './components/shop/ShopPage';
 import { CategoryPage } from './components/shop/CategoryPage';
+import { CarBatteriesPage } from './components/categories/CarBatteriesPage';
+import { BikeBatteriesPage } from './components/categories/BikeBatteriesPage';
+import { InverterBatteriesPage } from './components/categories/InverterBatteriesPage';
+import { LithiumBatteriesPage } from './components/categories/LithiumBatteriesPage';
+import { SolarBatteriesPage } from './components/categories/SolarBatteriesPage';
+import { IndustrialBatteriesPage } from './components/categories/IndustrialBatteriesPage';
+import { UPSBatteriesPage } from './components/categories/UPSBatteriesPage';
+import { AccessoriesPage } from './components/categories/AccessoriesPage';
+import { BrowseAllBatteriesPage } from './components/categories/BrowseAllBatteriesPage';
 import { ProductDetailPage } from './components/product/ProductDetailPage';
 import { ComparePage } from './components/compare/ComparePage';
 import { CartPage } from './components/cart/CartPage';
@@ -26,7 +36,10 @@ import { MaintenanceGuidePage } from './components/pages/MaintenanceGuidePage';
 import { FAQPage } from './components/pages/FAQPage';
 import { PolicyPages } from './components/pages/PolicyPages';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { BrandsPage } from './components/pages/BrandsPage';
+import { OffersPage } from './components/pages/OffersPage';
 import { NotFoundPage } from './components/pages/NotFoundPage';
+import { isDedicatedCategoryPage } from './utils/router';
 
 import { AnimatePresence } from 'motion/react';
 import { PageTransition } from './components/layout/PageTransition';
@@ -37,7 +50,12 @@ import { Home, Grid, ShoppingBag, Truck, User } from 'lucide-react';
 const MainContent: React.FC = () => {
   const { page, pageParams, navigate, cartItemCount, setIsCartOpen } = useStore();
 
-  const pageKey = `${page}-${pageParams?.category || ''}-${pageParams?.productId || ''}-${pageParams?.slug || ''}-${pageParams?.type || ''}-${pageParams?.tab || ''}`;
+  const pageKey =
+    page === 'category'
+      ? `category-${pageParams?.category || ''}`
+      : page === 'blog-detail'
+      ? `blog-detail-${pageParams?.slug || ''}`
+      : page;
 
   const renderCurrentPage = () => {
     switch (page) {
@@ -45,6 +63,28 @@ const MainContent: React.FC = () => {
         return <HomePage />;
       case 'shop':
         return <ShopPage />;
+      case 'all-batteries':
+        return <BrowseAllBatteriesPage />;
+      case 'car-batteries':
+        return <CarBatteriesPage />;
+      case 'bike-batteries':
+        return <BikeBatteriesPage />;
+      case 'inverter-batteries':
+        return <InverterBatteriesPage />;
+      case 'lithium-batteries':
+        return <LithiumBatteriesPage />;
+      case 'solar-batteries':
+        return <SolarBatteriesPage />;
+      case 'industrial-batteries':
+        return <IndustrialBatteriesPage />;
+      case 'ups-batteries':
+        return <UPSBatteriesPage />;
+      case 'accessories':
+        return <AccessoriesPage />;
+      case 'brands':
+        return <BrandsPage />;
+      case 'offers':
+        return <OffersPage />;
       case 'category':
         return <CategoryPage />;
       case 'product-detail':
@@ -82,20 +122,32 @@ const MainContent: React.FC = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col bg-[#17191C] text-[#F2F0EA] selection:bg-[#D6B98C] selection:text-[#17191C]">
-      <AnnouncementBar />
-      <Navbar />
+  const isProductDetail = page === 'product-detail';
 
-      <main className="flex-1 pb-16 sm:pb-0 overflow-x-hidden flex flex-col">
-        <AnimatePresence mode="wait" initial={false}>
-          <PageTransition pageKey={pageKey}>
-            {renderCurrentPage()}
-          </PageTransition>
-        </AnimatePresence>
+  return (
+    <div className="min-h-screen flex flex-col bg-white text-[#121417] selection:bg-[#D6B98C] selection:text-[#121417]">
+      {!isProductDetail && <AnnouncementBar />}
+      {!isProductDetail && <Navbar />}
+
+      <main
+        className={`flex-1 flex flex-col overflow-x-clip ${
+          isProductDetail ? '' : 'pb-20 sm:pb-0'
+        }`}
+      >
+        {isProductDetail ? (
+          <ProductDetailPage key={pageParams?.productId || 'default'} />
+        ) : page === 'home' ? (
+          <HomePage />
+        ) : (
+          <AnimatePresence mode="wait" initial={false}>
+            <PageTransition pageKey={pageKey}>
+              {renderCurrentPage()}
+            </PageTransition>
+          </AnimatePresence>
+        )}
       </main>
 
-      <Footer />
+      {!isProductDetail && <Footer />}
 
       {/* Global Modals & Drawers */}
       <CartDrawer />
@@ -103,69 +155,90 @@ const MainContent: React.FC = () => {
       <QuickViewModal />
       <ToastContainer />
 
-      {/* Mobile Bottom Quick Navigation (Respects 15% mobile viewport cap) */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#101214]/95 backdrop-blur-md border-t border-[#25282D] h-14 flex items-center justify-around px-2">
+      {/* Mobile Bottom Quick Navigation (Ergonomic Thumb Zone, >=44px hitboxes, respects 15% viewport cap) */}
+      {!isProductDetail && (
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 h-16 px-1 flex items-stretch justify-around pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-xl">
         <button
           onClick={() => navigate('home')}
-          className={`flex flex-col items-center justify-center p-1 text-[10px] ${
-            page === 'home' ? 'text-[#D6B98C]' : 'text-[#8E959E]'
+          className={`flex-1 min-h-[44px] flex flex-col items-center justify-center py-1 text-[11px] font-medium transition-all active:scale-95 ${
+            page === 'home' ? 'text-[#B59562]' : 'text-gray-500 hover:text-gray-900'
           }`}
+          aria-label="Home"
         >
-          <Home className="w-4 h-4" />
+          <Home className="w-4 h-4 mb-1" />
           <span>Home</span>
+          {page === 'home' && <span className="w-1 h-1 rounded-full bg-[#B59562] mt-0.5" />}
         </button>
 
         <button
-          onClick={() => navigate('shop')}
-          className={`flex flex-col items-center justify-center p-1 text-[10px] ${
-            page === 'shop' ? 'text-[#D6B98C]' : 'text-[#8E959E]'
+          onClick={() => navigate('all-batteries')}
+          className={`flex-1 min-h-[44px] flex flex-col items-center justify-center py-1 text-[11px] font-medium transition-all active:scale-95 ${
+            page === 'shop' || page === 'all-batteries' || page === 'category' || isDedicatedCategoryPage(page)
+              ? 'text-[#B59562]'
+              : 'text-gray-500 hover:text-gray-900'
           }`}
+          aria-label="Shop Batteries"
         >
-          <Grid className="w-4 h-4" />
+          <Grid className="w-4 h-4 mb-1" />
           <span>Shop</span>
-        </button>
-
-        <button
-          onClick={() => navigate('tracking')}
-          className={`flex flex-col items-center justify-center p-1 text-[10px] ${
-            page === 'tracking' ? 'text-[#D6B98C]' : 'text-[#8E959E]'
-          }`}
-        >
-          <Truck className="w-4 h-4" />
-          <span>Track</span>
-        </button>
-
-        <button
-          onClick={() => setIsCartOpen(true)}
-          className="relative flex flex-col items-center justify-center p-1 text-[10px] text-[#8E959E]"
-        >
-          <ShoppingBag className="w-4 h-4 text-[#D6B98C]" />
-          <span>Cart</span>
-          {cartItemCount > 0 && (
-            <span className="absolute 0 top-0.5 right-2 bg-[#D6B98C] text-[#17191C] text-[9px] font-bold px-1 rounded-full font-mono">
-              {cartItemCount}
-            </span>
+          {(page === 'shop' || page === 'all-batteries' || page === 'category' || isDedicatedCategoryPage(page)) && (
+            <span className="w-1 h-1 rounded-full bg-[#B59562] mt-0.5" />
           )}
         </button>
 
         <button
-          onClick={() => navigate('account')}
-          className={`flex flex-col items-center justify-center p-1 text-[10px] ${
-            page === 'account' ? 'text-[#D6B98C]' : 'text-[#8E959E]'
+          onClick={() => navigate('tracking')}
+          className={`relative flex-1 min-h-[44px] flex flex-col items-center justify-center py-1 text-[11px] font-medium transition-all active:scale-95 ${
+            page === 'tracking' ? 'text-[#B59562]' : 'text-gray-500 hover:text-gray-900'
           }`}
+          aria-label="Track Order"
         >
-          <User className="w-4 h-4" />
-          <span>Account</span>
+          <div className="relative">
+            <Truck className="w-4 h-4 mb-1" />
+          </div>
+          <span>Track</span>
+          {page === 'tracking' && <span className="w-1 h-1 rounded-full bg-[#B59562] mt-0.5" />}
         </button>
-      </nav>
+
+        <button
+          onClick={() => setIsCartOpen(true)}
+          className="relative flex-1 min-h-[44px] flex flex-col items-center justify-center py-1 text-[11px] font-medium text-gray-500 hover:text-gray-900 active:scale-95 transition-all"
+          aria-label="Open Shopping Cart"
+        >
+          <div className="relative">
+            <ShoppingBag className="w-4 h-4 mb-1 text-[#B59562]" />
+            {cartItemCount > 0 && (
+              <span className="absolute -top-1 -right-2 bg-[#121417] text-[#D6B98C] text-[9px] font-bold px-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full font-mono">
+                {cartItemCount}
+              </span>
+            )}
+          </div>
+          <span>Cart</span>
+        </button>
+
+        <button
+          onClick={() => navigate('account')}
+          className={`flex-1 min-h-[44px] flex flex-col items-center justify-center py-1 text-[11px] font-medium transition-all active:scale-95 ${
+            page === 'account' ? 'text-[#B59562]' : 'text-gray-500 hover:text-gray-900'
+          }`}
+          aria-label="Account Profile"
+        >
+          <User className="w-4 h-4 mb-1" />
+          <span>Account</span>
+          {page === 'account' && <span className="w-1 h-1 rounded-full bg-[#B59562] mt-0.5" />}
+        </button>
+        </nav>
+      )}
     </div>
   );
 };
 
 export default function App() {
   return (
-    <StoreProvider>
-      <MainContent />
-    </StoreProvider>
+    <ErrorBoundary>
+      <StoreProvider>
+        <MainContent />
+      </StoreProvider>
+    </ErrorBoundary>
   );
 }

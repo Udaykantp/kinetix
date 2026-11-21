@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Package,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { Product, ProductCategory, BatteryTechnology, OrderStatus } from '../../types';
+import defaultBatteryImg from '../../assets/images/hero_battery_titanium_1794476148118.jpg';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -32,9 +33,25 @@ export const AdminDashboard: React.FC = () => {
     appliedCoupon,
     showToast,
     navigate,
+    pageParams,
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'customers' | 'coupons' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'customers' | 'coupons' | 'settings'>(
+    pageParams?.tab || 'overview'
+  );
+
+  useEffect(() => {
+    if (pageParams?.tab) {
+      setActiveTab(pageParams.tab);
+    }
+  }, [pageParams?.tab]);
+
+  const handleAdminTabChange = (
+    tab: 'overview' | 'products' | 'orders' | 'customers' | 'coupons' | 'settings'
+  ) => {
+    setActiveTab(tab);
+    navigate('admin', { tab }, { replace: true, skipScroll: true });
+  };
 
   // Search & filter in product management
   const [productSearch, setProductSearch] = useState('');
@@ -86,7 +103,7 @@ export const AdminDashboard: React.FC = () => {
       reviewCount: 1,
       inStock: newProdStock > 0,
       stockCount: Number(newProdStock),
-      images: ['/src/assets/images/hero_battery_titanium_1794476148118.jpg'],
+      images: [defaultBatteryImg],
       capacityAh: Number(newProdAh),
       voltage: newProdVoltage,
       technology: newProdTech,
@@ -132,14 +149,14 @@ export const AdminDashboard: React.FC = () => {
     <div className="bg-[#17191C] min-h-screen py-8 border-b border-[#25282D]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Admin Navigation Top Header */}
-        <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#25282D] border border-[#D6B98C]/30 flex items-center justify-center text-[#D6B98C]">
-              <Shield className="w-6 h-6" />
+        <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-5 sm:p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 shadow-xl">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#25282D] border border-[#D6B98C]/30 flex items-center justify-center text-[#D6B98C] shrink-0">
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-bold text-[#F2F0EA]">KINETIX Central Admin Panel</span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-lg sm:text-xl font-bold text-[#F2F0EA]">KINETIX Central Admin Panel</span>
                 <span className="text-[10px] font-mono bg-[#25282D] text-[#D6B98C] px-2 py-0.5 rounded border border-[#343940]">
                   ROLE: SUPER_ADMIN
                 </span>
@@ -152,14 +169,14 @@ export const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => navigate('home')}
-            className="px-4 py-2 bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] border border-[#343940] text-xs font-semibold rounded-lg"
+            className="w-full md:w-auto min-h-[40px] px-4 py-2 bg-[#25282D] hover:bg-[#343940] text-[#F2F0EA] border border-[#343940] text-xs font-semibold rounded-lg text-center"
           >
             ← Exit to Customer Storefront
           </button>
         </div>
 
         {/* Admin Tab Switcher */}
-        <div className="flex items-center gap-2 border-b border-[#25282D] pb-4 mb-8 overflow-x-auto text-xs font-medium">
+        <div className="flex items-center gap-2 border-b border-[#25282D] pb-4 mb-8 overflow-x-auto no-scrollbar text-xs font-medium">
           {[
             { id: 'overview', label: 'Overview & Analytics', icon: LayoutDashboard },
             { id: 'products', label: 'Product Inventory', icon: Package },
@@ -172,7 +189,7 @@ export const AdminDashboard: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => handleAdminTabChange(tab.id as any)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg whitespace-nowrap transition-colors ${
                   activeTab === tab.id
                     ? 'bg-[#D6B98C] text-[#17191C] font-bold'
@@ -267,8 +284,9 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Responsive SVG Chart */}
-              <div className="h-48 w-full">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 700 160">
+              <div className="overflow-x-auto no-scrollbar pb-2">
+                <div className="h-52 min-w-[480px] w-full">
+                  <svg className="w-full h-full" viewBox="0 0 700 185">
                   {/* Grid Lines */}
                   <line x1="0" y1="40" x2="700" y2="40" stroke="#25282D" strokeDasharray="3 3" />
                   <line x1="0" y1="80" x2="700" y2="80" stroke="#25282D" strokeDasharray="3 3" />
@@ -319,7 +337,8 @@ export const AdminDashboard: React.FC = () => {
                       </text>
                     </g>
                   ))}
-                </svg>
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -491,7 +510,7 @@ export const AdminDashboard: React.FC = () => {
                   className="bg-[#101214] border border-[#25282D] rounded-2xl p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6"
                 >
                   <div className="space-y-2">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                       <span className="text-base font-bold text-[#F2F0EA] font-mono">
                         {ord.id}
                       </span>
@@ -513,8 +532,8 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="text-right">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full lg:w-auto justify-between lg:justify-end">
+                    <div className="text-left sm:text-right">
                       <div className="text-base font-bold font-mono text-[#D6B98C]">
                         ₹{ord.total.toLocaleString('en-IN')}
                       </div>
@@ -538,6 +557,7 @@ export const AdminDashboard: React.FC = () => {
                         <option value="Dispatched">Dispatched</option>
                         <option value="Out for Delivery">Out for Delivery</option>
                         <option value="Delivered">Delivered</option>
+                        <option value="Return Requested">Return Requested</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
                     </div>
@@ -561,13 +581,13 @@ export const AdminDashboard: React.FC = () => {
               ].map((c, idx) => (
                 <div
                   key={idx}
-                  className="p-4 bg-[#17191C] border border-[#25282D] rounded-xl flex items-center justify-between text-xs"
+                  className="p-4 bg-[#17191C] border border-[#25282D] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <h4 className="font-bold text-[#F2F0EA]">{c.name}</h4>
-                    <p className="text-[#8E959E]">{c.email} · {c.city}</p>
+                    <p className="text-[#8E959E] break-all sm:break-normal">{c.email} · {c.city}</p>
                   </div>
-                  <div className="text-right font-mono">
+                  <div className="text-left sm:text-right font-mono shrink-0">
                     <span className="text-[#D6B98C] font-bold block">{c.spend}</span>
                     <span className="text-[#8E959E]">{c.orders} Orders Placed</span>
                   </div>
@@ -708,7 +728,7 @@ export const AdminDashboard: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[#8E959E] font-mono text-[10px] uppercase mb-1">
                     Category
@@ -742,7 +762,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[#8E959E] font-mono text-[10px] uppercase mb-1">
                     Selling Price (₹)
@@ -770,7 +790,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[#8E959E] font-mono text-[10px] uppercase mb-1">
                     Capacity (Ah)

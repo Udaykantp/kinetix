@@ -12,10 +12,10 @@ export const TrustedBrands: React.FC = () => {
   ];
 
   return (
-    <section className="py-12 bg-[#17191C] border-b border-[#25282D]">
+    <section className="py-12 bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
-          <div className="text-xs font-mono uppercase tracking-widest text-[#8E959E]">
+          <div className="text-xs font-mono uppercase tracking-widest text-gray-500 font-medium">
             Authorized Direct Manufacturer Distribution & Testing
           </div>
         </div>
@@ -24,30 +24,30 @@ export const TrustedBrands: React.FC = () => {
           {brands.map((brand, idx) => (
             <div
               key={idx}
-              className="py-4 px-3 bg-[#25282D]/40 border border-[#343940]/50 rounded-lg text-center"
+              className="py-4 px-3 bg-gray-50 border border-gray-200 rounded-lg text-center shadow-xs"
             >
-              <span className="text-xs font-bold tracking-wider text-[#B7BCC2] font-mono">
+              <span className="text-xs font-bold tracking-wider text-gray-700 font-mono">
                 {brand}
               </span>
             </div>
           ))}
         </div>
 
-        <div className="mt-8 pt-6 border-t border-[#25282D] flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-[#8E959E] font-mono">
-          <span className="flex items-center gap-1.5 text-[#B7BCC2]">
-            <ShieldCheck className="w-4 h-4 text-[#D6B98C]" />
+        <div className="mt-8 pt-6 border-t border-gray-100 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-gray-500 font-mono">
+          <span className="flex items-center gap-1.5 text-gray-700">
+            <ShieldCheck className="w-4 h-4 text-[#B59562]" />
             <span>BIS IS 14257:2018 Standard</span>
           </span>
-          <span className="flex items-center gap-1.5 text-[#B7BCC2]">
-            <Award className="w-4 h-4 text-[#D6B98C]" />
+          <span className="flex items-center gap-1.5 text-gray-700">
+            <Award className="w-4 h-4 text-[#B59562]" />
             <span>ARAI Automotive Testing Passed</span>
           </span>
-          <span className="flex items-center gap-1.5 text-[#B7BCC2]">
-            <CheckCircle className="w-4 h-4 text-[#D6B98C]" />
+          <span className="flex items-center gap-1.5 text-gray-700">
+            <CheckCircle className="w-4 h-4 text-[#B59562]" />
             <span>ISO 9001:2015 Precision Calibrated</span>
           </span>
-          <span className="flex items-center gap-1.5 text-[#B7BCC2]">
-            <ShieldCheck className="w-4 h-4 text-[#D6B98C]" />
+          <span className="flex items-center gap-1.5 text-gray-700">
+            <ShieldCheck className="w-4 h-4 text-[#B59562]" />
             <span>IEC 62619 Prismatic Safety</span>
           </span>
         </div>

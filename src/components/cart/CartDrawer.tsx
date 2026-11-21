@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Plus,
@@ -32,6 +32,17 @@ export const CartDrawer: React.FC = () => {
   const [couponCode, setCouponCode] = useState('');
   const [couponError, setCouponError] = useState('');
 
+  useEffect(() => {
+    if (!isCartOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsCartOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isCartOpen, setIsCartOpen]);
+
   if (!isCartOpen) return null;
 
   const handleApplyCoupon = (e: React.FormEvent) => {
@@ -49,15 +60,20 @@ export const CartDrawer: React.FC = () => {
   const progressPercent = Math.min(100, Math.round((cartSubtotal / freeShippingThreshold) * 100));
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div
+      className="fixed inset-0 z-[70] overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Shopping Bag"
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
         onClick={() => setIsCartOpen(false)}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-[#101214] border-l border-[#25282D] flex flex-col justify-between shadow-2xl">
+      <div className="fixed inset-y-0 right-0 max-w-full flex sm:pl-10">
+        <div className="w-screen max-w-full sm:max-w-md bg-white border-l border-gray-200 flex flex-col justify-between shadow-2xl">
           {/* Header */}
           <div className="p-5 border-b border-[#25282D] flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -127,18 +143,24 @@ export const CartDrawer: React.FC = () => {
                   <img
                     src={item.product.images[0]}
                     alt={item.product.name}
-                    className="w-16 h-16 object-cover rounded-lg bg-[#25282D] shrink-0 border border-[#343940]"
+                    style={item.finishFilter ? { filter: item.finishFilter } : undefined}
+                    className="w-16 h-16 object-cover rounded-lg bg-[#25282D] shrink-0 border border-[#343940] transition-all duration-300"
                   />
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-bold text-[#F2F0EA] truncate">
                       {item.product.name}
                     </h4>
                     <div className="text-[11px] text-[#8E959E] font-mono mt-0.5">
-                      {item.product.voltage} · {item.product.capacityAh > 0 ? `${item.product.capacityAh}Ah · ` : ''}
-                      {item.product.warrantyMonths}M
+                      {item.finishName ? `${item.finishName} · ` : ''}
+                      {item.capacityLabel
+                        ? `${item.capacityLabel} · `
+                        : item.product.capacityAh > 0
+                        ? `${item.product.capacityAh}Ah · `
+                        : ''}
+                      {item.product.voltage} · {item.product.warrantyMonths}M
                     </div>
                     <div className="text-xs font-bold text-[#D6B98C] font-mono mt-1 tabular-nums">
-                      ₹{item.product.price.toLocaleString('en-IN')}
+                      ₹{(item.unitPrice ?? item.product.price).toLocaleString('en-IN')}
                     </div>
 
                     {/* Quantity Stepper */}
@@ -258,7 +280,7 @@ export const CartDrawer: React.FC = () => {
                   setIsCartOpen(false);
                   navigate('checkout');
                 }}
-                className="w-full py-3 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-semibold text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"
+                className="w-full min-h-[48px] py-3.5 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-semibold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
               >
                 <span>Proceed to Direct Checkout</span>
                 <ArrowRight className="w-4 h-4" />

@@ -1,7 +1,25 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  where,
+  writeBatch,
+  serverTimestamp,
+} from 'firebase/firestore';
 import {
   Product,
-  ProductCategory,
   CartItem,
   Coupon,
   Order,
@@ -10,26 +28,25 @@ import {
   Address,
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_COUPONS } from '../data/products';
+import {
+  PageType,
+  buildUrlFromRoute,
+  getCurrentRouteFromWindow,
+} from '../utils/router';
+import {
+  auth,
+  db,
+  googleProvider,
+  handleFirestoreError,
+  OperationType,
+} from '../firebase';
 
-export type PageType =
-  | 'home'
-  | 'shop'
-  | 'category'
-  | 'product-detail'
-  | 'compare'
-  | 'cart'
-  | 'checkout'
-  | 'account'
-  | 'tracking'
-  | 'about'
-  | 'contact'
-  | 'blog'
-  | 'blog-detail'
-  | 'faq'
-  | 'buying-guide'
-  | 'maintenance-guide'
-  | 'policy'
-  | 'admin';
+export type { PageType };
+
+export interface NavigateOptions {
+  replace?: boolean;
+  skipScroll?: boolean;
+}
 
 interface ToastInfo {
   id: string;
@@ -37,11 +54,32 @@ interface ToastInfo {
   type: 'success' | 'info' | 'error';
 }
 
+export interface ProfileUpdateInput {
+  name: string;
+  phone: string;
+  gender: '' | 'Male' | 'Female' | 'Other';
+}
+
+export interface AddressSaveInput {
+  id?: string;
+  label?: 'Home' | 'Work' | 'Other';
+  fullName: string;
+  phone: string;
+  email: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  pinCode: string;
+  isDefault?: boolean;
+}
+
 interface StoreContextType {
   // Navigation
   page: PageType;
   pageParams: Record<string, any>;
-  navigate: (newPage: PageType, params?: Record<string, any>) => void;
+  navigate: (newPage: PageType, params?: Record<string, any>, options?: NavigateOptions) => void;
+  getRouteUrl: (targetPage: PageType, params?: Record<string, any>) => string;
 
   // Products
   products: Product[];
@@ -56,7 +94,16 @@ interface StoreContextType {
 
   // Cart
   cart: CartItem[];
-  addToCart: (product: Product, quantity?: number) => void;
+  addToCart: (
+    product: Product,
+    quantity?: number,
+    options?: {
+      finishName?: string;
+      finishFilter?: string;
+      capacityLabel?: string;
+      unitPrice?: number;
+    }
+  ) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
@@ -77,6 +124,8 @@ interface StoreContextType {
   // Wishlist
   wishlist: Product[];
   toggleWishlist: (product: Product) => void;
+  clearWishlist: () => void;
+  moveAllWishlistToCart: () => void;
   isInWishlist: (productId: string) => boolean;
 
   // Comparison
@@ -86,24 +135,30 @@ interface StoreContextType {
   clearComparison: () => void;
   isInComparison: (productId: string) => boolean;
 
-  // User & Auth
+  // User & Firebase Auth
   user: User | null;
-  login: (email: string, role?: 'customer' | 'admin') => void;
-  logout: () => void;
-  registerUser: (name: string, email: string, phone: string) => void;
-  updateSavedAddresses: (addresses: Address[]) => void;
+  authLoading: boolean;
+  signInWithGoogle: (prefill?: { name?: string; phone?: string }) => Promise<boolean>;
+  logout: () => Promise<void>;
+  updateUserProfile: (updates: ProfileUpdateInput) => Promise<void>;
+  saveAddress: (address: AddressSaveInput) => Promise<void>;
+  deleteAddress: (addressId: string) => Promise<void>;
+  setDefaultAddress: (addressId: string) => Promise<void>;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
 
-  // Orders
+  // Orders (Firestore for signed-in users + localStorage for guests)
   orders: Order[];
   placeOrder: (details: {
     shippingAddress: Address;
     paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery';
-    deliverySpeed?: string;
-    notes?: string;
-  }) => Order;
-  updateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => void;
+    deliverySpeed?: 'express' | 'standard';
+    saveAddressToProfile?: boolean;
+  }) => Promise<Order>;
+  cancelOrder: (orderId: string, reason?: string) => Promise<void>;
+  requestOrderReturn: (orderId: string, reason: string) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => Promise<void>;
+  linkGuestOrderToAccount: (order: Order) => Promise<boolean>;
   getOrderById: (orderId: string) => Order | undefined;
 
   // Quick View
@@ -127,7 +182,10 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
-const SEED_ORDERS: Order[] = [
+const BOOTSTRAPPED_ADMIN_EMAIL = 'udaykantp9199@gmail.com';
+const GUEST_ORDERS_KEY = 'kinetix_guest_orders';
+
+const SAMPLE_TRACKING_ORDERS: Order[] = [
   {
     id: 'KTX-89214',
     date: '2026-03-01T10:15:00Z',
@@ -241,49 +299,118 @@ const SEED_ORDERS: Order[] = [
   },
 ];
 
-const DEFAULT_USER: User = {
-  id: 'usr_premium_1',
-  name: 'Udaykant Patel',
-  email: 'udaykantp9199@gmail.com',
-  phone: '+91 98210 55432',
-  role: 'customer',
-  addresses: [
-    {
-      id: 'addr-1',
-      fullName: 'Udaykant Patel',
-      phone: '+91 98210 55432',
-      email: 'udaykantp9199@gmail.com',
-      addressLine1: 'B-702, Prestige Titanium Towers, Outer Ring Road',
-      addressLine2: 'Near Marathahalli Junction',
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      pinCode: '560103',
-      isDefault: true,
-    },
-    {
-      id: 'addr-2',
-      fullName: 'Udaykant Patel (Office / Lab)',
-      phone: '+91 98210 55432',
-      email: 'udaykantp9199@gmail.com',
-      addressLine1: 'Suite 404, Tech Park Sigma, Electronic City Phase 1',
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      pinCode: '560100',
-      isDefault: false,
-    },
-  ],
-};
+// Recursively remove undefined fields before sending any nested payload to Firestore
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefined(item)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value as Record<string, any>)) {
+      if (v !== undefined) {
+        cleaned[k] = stripUndefined(v);
+      }
+    }
+    return cleaned as T;
+  }
+  return value;
+}
+
+function clampString(val: string | null | undefined, max: number, fallback = ''): string {
+  const cleaned = (val ?? '').trim();
+  if (!cleaned) return fallback;
+  return cleaned.slice(0, max);
+}
+
+function sanitizeShippingAddress(addr: Address): Address {
+  const result: Address = {
+    fullName: clampString(addr.fullName, 100, 'Customer'),
+    phone: clampString(addr.phone, 30, '0000000000').padEnd(6, '0'),
+    email: clampString(addr.email, 200, ''),
+    addressLine1: clampString(addr.addressLine1, 250, 'Address'),
+    addressLine2: clampString(addr.addressLine2, 200, ''),
+    city: clampString(addr.city, 80, 'Mumbai'),
+    state: clampString(addr.state, 80, 'Maharashtra'),
+    pinCode: clampString(addr.pinCode, 12, '400001'),
+  };
+  if (addr.id && /^[a-zA-Z0-9_-]{1,128}$/.test(addr.id)) {
+    result.id = addr.id;
+  }
+  if (addr.label && ['Home', 'Work', 'Other'].includes(addr.label)) {
+    result.label = addr.label;
+  }
+  if (typeof addr.isDefault === 'boolean') {
+    result.isDefault = addr.isDefault;
+  }
+  return result;
+}
+
+const INITIAL_PRODUCTS_BY_ID = new Map(INITIAL_PRODUCTS.map((p) => [p.id, p]));
+
+function repairProductImages(product: Product): Product {
+  if (!product || !product.id) return product;
+  const seed = INITIAL_PRODUCTS_BY_ID.get(product.id);
+  const currentImages = Array.isArray(product.images) ? product.images : [];
+  const hasStaleSrcPath =
+    currentImages.length === 0 ||
+    currentImages.some((src) => typeof src !== 'string' || src.startsWith('/src/assets/'));
+
+  if (hasStaleSrcPath && seed) {
+    return { ...product, images: seed.images };
+  }
+  return product;
+}
+
+function loadGuestOrders(): Order[] {
+  try {
+    const saved = localStorage.getItem(GUEST_ORDERS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.map((order: Order) => ({
+          ...order,
+          items: Array.isArray(order.items)
+            ? order.items.map((item) => ({
+                ...item,
+                product: repairProductImages(item.product),
+              }))
+            : [],
+        }));
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return [];
+}
+
+function saveGuestOrders(ordersList: Order[]) {
+  try {
+    localStorage.setItem(GUEST_ORDERS_KEY, JSON.stringify(ordersList));
+  } catch (e) {
+    console.error(e);
+  }
+}
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Navigation state
-  const [page, setPage] = useState<PageType>('home');
-  const [pageParams, setPageParams] = useState<Record<string, any>>({});
+  // Navigation state initialized synchronously from browser URL for instant deep-link rendering
+  const [initialRoute] = useState(() => getCurrentRouteFromWindow());
+  const [page, setPage] = useState<PageType>(initialRoute.page);
+  const [pageParams, setPageParams] = useState<Record<string, any>>(initialRoute.params);
 
   // Products
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('kinetix_products');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: Product[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const repaired = parsed.map(repairProductImages);
+          const existingIds = new Set(repaired.map((p) => p.id));
+          const missingSeed = INITIAL_PRODUCTS.filter((p) => !existingIds.has(p.id));
+          return missingSeed.length > 0 ? [...repaired, ...missingSeed] : repaired;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -291,8 +418,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   useEffect(() => {
-    localStorage.setItem('kinetix_products', JSON.stringify(products));
+    try {
+      localStorage.setItem('kinetix_products', JSON.stringify(products));
+    } catch {
+      // Ignore storage quota or restricted iframe errors
+    }
   }, [products]);
+
+  const productsRef = useRef(products);
+  productsRef.current = products;
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -304,7 +438,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const valid = parsed.filter((item) => item && item.product && item.product.id);
+          const valid = parsed
+            .filter((item) => item && item.product && item.product.id)
+            .map((item: CartItem) => ({
+              ...item,
+              product: repairProductImages(item.product),
+            }));
           if (valid.length > 0) return valid;
         }
       }
@@ -318,31 +457,44 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   useEffect(() => {
-    localStorage.setItem('kinetix_cart', JSON.stringify(cart));
+    try {
+      localStorage.setItem('kinetix_cart', JSON.stringify(cart));
+    } catch {
+      // Ignore storage quota or restricted iframe errors
+    }
   }, [cart]);
 
   // Coupon
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(INITIAL_COUPONS[0]);
 
-  // Wishlist
+  // Wishlist (synced to Firestore when signed in, localStorage when guest)
   const [wishlist, setWishlist] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('kinetix_wishlist');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const valid = parsed.filter((p) => p && p.id);
-          if (valid.length > 0) return valid;
+          return parsed
+            .filter((p) => p && p.id)
+            .map(repairProductImages)
+            .slice(0, 50);
         }
       }
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_PRODUCTS.slice(5, 7);
+    return [];
   });
 
+  const wishlistRef = useRef(wishlist);
+  wishlistRef.current = wishlist;
+
   useEffect(() => {
-    localStorage.setItem('kinetix_wishlist', JSON.stringify(wishlist));
+    try {
+      localStorage.setItem('kinetix_wishlist', JSON.stringify(wishlist));
+    } catch {
+      // Ignore storage quota or restricted iframe errors
+    }
   }, [wishlist]);
 
   // Comparison
@@ -350,42 +502,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_PRODUCTS.slice(0, 2);
   });
 
-  // User
-  const [user, setUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem('kinetix_user');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return DEFAULT_USER;
-  });
+  // Firebase Auth & Firestore User State
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [firestoreOrders, setFirestoreOrders] = useState<Order[]>([]);
+  const [guestOrders, setGuestOrders] = useState<Order[]>(() => loadGuestOrders());
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('kinetix_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('kinetix_user');
+  // Combined visible orders: Firestore orders when signed in (+ any unlinked guest orders), or guest orders when signed out
+  const orders: Order[] = React.useMemo(() => {
+    if (!firebaseUser) {
+      return guestOrders;
     }
-  }, [user]);
-
-  // Orders
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem('kinetix_orders');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return SEED_ORDERS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('kinetix_orders', JSON.stringify(orders));
-  }, [orders]);
+    const seen = new Set(firestoreOrders.map((o) => o.id));
+    const merged = [
+      ...firestoreOrders,
+      ...guestOrders.filter((g) => !seen.has(g.id)),
+    ];
+    return merged.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [firebaseUser, firestoreOrders, guestOrders]);
 
   // Modals & Drawers
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -395,27 +530,428 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Toasts
   const [toasts, setToasts] = useState<ToastInfo[]>([]);
 
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3800);
-  };
+  }, []);
 
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const navigate = (newPage: PageType, params: Record<string, any> = {}) => {
+  // Ensure /users/{uid} profile doc exists in Firestore
+  const ensureUserProfileDoc = useCallback(
+    async (
+      fbUser: FirebaseUser,
+      prefill?: { name?: string; phone?: string }
+    ): Promise<void> => {
+      const userRef = doc(db, 'users', fbUser.uid);
+      try {
+        const snap = await getDoc(userRef);
+        const safeEmail = clampString(fbUser.email, 200, 'user@example.com');
+        const safeName = clampString(
+          prefill?.name || fbUser.displayName || safeEmail.split('@')[0],
+          100,
+          'Customer'
+        );
+        const safePhone = clampString(prefill?.phone || fbUser.phoneNumber || '', 30, '');
+
+        if (!snap.exists()) {
+          const initialWishlistIds = wishlistRef.current
+            .map((p) => p.id)
+            .filter((id) => typeof id === 'string' && id.length <= 128)
+            .slice(0, 50);
+
+          await setDoc(userRef, {
+            uid: fbUser.uid,
+            name: safeName,
+            email: safeEmail,
+            phone: safePhone,
+            gender: '',
+            role: 'customer',
+            wishlistIds: initialWishlistIds,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          const existingData = snap.data();
+
+          // Merge any locally hearted guest items into cloud wishlist (capped at 50)
+          const existingIds: string[] = Array.isArray(existingData.wishlistIds)
+            ? existingData.wishlistIds.filter((id: unknown): id is string => typeof id === 'string')
+            : [];
+          const localIds = wishlistRef.current
+            .map((p) => p.id)
+            .filter((id) => typeof id === 'string' && id.length <= 128);
+          const mergedIds = Array.from(new Set([...existingIds, ...localIds])).slice(0, 50);
+
+          if (mergedIds.length !== existingIds.length) {
+            await updateDoc(userRef, {
+              wishlistIds: mergedIds,
+              updatedAt: serverTimestamp(),
+            });
+          }
+
+          if (prefill && (prefill.name?.trim() || prefill.phone?.trim())) {
+            const nextName = clampString(prefill.name || existingData.name, 100, 'Customer');
+            const nextPhone = clampString(prefill.phone || existingData.phone, 30, '');
+            const nextGender = (['', 'Male', 'Female', 'Other'].includes(existingData.gender)
+              ? existingData.gender
+              : '') as '' | 'Male' | 'Female' | 'Other';
+
+            await updateDoc(userRef, {
+              name: nextName,
+              phone: nextPhone,
+              gender: nextGender,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `users/${fbUser.uid}`);
+      }
+    },
+    []
+  );
+
+  // Firebase Auth listener
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (!fbUser) {
+        setUser(null);
+        setFirestoreOrders([]);
+        setAuthLoading(false);
+        return;
+      }
+
+      // Optimistically set basic profile while Firestore listeners attach
+      const effectiveRole: 'customer' | 'admin' =
+        fbUser.email?.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL ? 'admin' : 'customer';
+
+      setUser((prev) => ({
+        id: fbUser.uid,
+        name: prev?.id === fbUser.uid ? prev.name : fbUser.displayName || fbUser.email?.split('@')[0] || 'Customer',
+        email: fbUser.email || '',
+        phone: prev?.id === fbUser.uid ? prev.phone : fbUser.phoneNumber || '',
+        gender: prev?.id === fbUser.uid ? prev.gender : '',
+        photoURL: fbUser.photoURL || undefined,
+        role: effectiveRole,
+        addresses: prev?.id === fbUser.uid ? prev.addresses : [],
+      }));
+
+      try {
+        await ensureUserProfileDoc(fbUser);
+      } catch (err) {
+        console.error('Failed to ensure user profile doc:', err);
+      } finally {
+        setAuthLoading(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, [ensureUserProfileDoc]);
+
+  // Firestore real-time listeners (strictly gated on authenticated firebaseUser)
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    const uid = firebaseUser.uid;
+    const isBootstrappedAdmin =
+      firebaseUser.email?.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL;
+
+    // 1. User Profile & Wishlist listener
+    const userDocRef = doc(db, 'users', uid);
+    const unsubProfile = onSnapshot(
+      userDocRef,
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const resolvedRole: 'customer' | 'admin' =
+          isBootstrappedAdmin || data.role === 'admin' ? 'admin' : 'customer';
+
+        setUser((prev) => ({
+          id: uid,
+          name: data.name || firebaseUser.displayName || 'Customer',
+          email: data.email || firebaseUser.email || '',
+          phone: data.phone || '',
+          gender: data.gender || '',
+          photoURL: firebaseUser.photoURL || undefined,
+          role: resolvedRole,
+          addresses: prev?.id === uid ? prev.addresses : [],
+        }));
+
+        if (Array.isArray(data.wishlistIds)) {
+          const allProds = productsRef.current;
+          const syncedWishlist = data.wishlistIds
+            .map((pid: string) => allProds.find((p) => p.id === pid))
+            .filter((p): p is Product => Boolean(p));
+          setWishlist(syncedWishlist);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, `users/${uid}`);
+      }
+    );
+
+    // 2. Saved Addresses subcollection listener
+    const addressesColRef = collection(db, 'users', uid, 'addresses');
+    const unsubAddresses = onSnapshot(
+      addressesColRef,
+      (snapshot) => {
+        const loaded: Address[] = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: data.id || d.id,
+            label: (['Home', 'Work', 'Other'].includes(data.label) ? data.label : 'Home') as
+              | 'Home'
+              | 'Work'
+              | 'Other',
+            fullName: data.fullName || '',
+            phone: data.phone || '',
+            email: data.email || '',
+            addressLine1: data.addressLine1 || '',
+            addressLine2: data.addressLine2 || '',
+            city: data.city || '',
+            state: data.state || '',
+            pinCode: data.pinCode || '',
+            isDefault: Boolean(data.isDefault),
+          };
+        });
+        // Sort default address first
+        loaded.sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)));
+
+        setUser((prev) =>
+          prev && prev.id === uid ? { ...prev, addresses: loaded } : prev
+        );
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, `users/${uid}/addresses`);
+      }
+    );
+
+    // 3. Orders collection listener (admin sees all orders, customer sees their own)
+    const ordersQuery = isBootstrappedAdmin
+      ? collection(db, 'orders')
+      : query(collection(db, 'orders'), where('userId', '==', uid));
+
+    const unsubOrders = onSnapshot(
+      ordersQuery,
+      (snapshot) => {
+        const loadedOrders: Order[] = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: data.id || d.id,
+            userId: data.userId,
+            date: data.date || new Date().toISOString(),
+            items: Array.isArray(data.items)
+              ? data.items.map((item: any) => ({
+                  ...item,
+                  product: repairProductImages(item.product),
+                }))
+              : [],
+            subtotal: Number(data.subtotal) || 0,
+            tax: Number(data.tax) || 0,
+            discount: Number(data.discount) || 0,
+            shipping: Number(data.shipping) || 0,
+            total: Number(data.total) || 0,
+            status: (data.status || 'Order Placed') as OrderStatus,
+            paymentMethod: data.paymentMethod || 'UPI',
+            paymentStatus: data.paymentStatus || 'Paid',
+            shippingAddress: data.shippingAddress,
+            trackingNumber: data.trackingNumber || '',
+            carrier: data.carrier || 'KINETIX SuperFast Verified Logistics',
+            estimatedDelivery: data.estimatedDelivery || 'Within 24-48 Hours',
+            statusHistory: Array.isArray(data.statusHistory) ? data.statusHistory : [],
+            returnReason: data.returnReason,
+          };
+        });
+        loadedOrders.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        setFirestoreOrders(loadedOrders);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'orders');
+      }
+    );
+
+    return () => {
+      unsubProfile();
+      unsubAddresses();
+      unsubOrders();
+    };
+  }, [firebaseUser]);
+
+  const navigate = (
+    newPage: PageType,
+    params: Record<string, any> = {},
+    options: NavigateOptions = {}
+  ) => {
     setPage(newPage);
     setPageParams(params);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (typeof window !== 'undefined') {
+      const targetUrl = buildUrlFromRoute(newPage, params);
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (targetUrl !== currentUrl) {
+        try {
+          if (options.replace) {
+            window.history.replaceState({ page: newPage, params }, '', targetUrl);
+          } else {
+            window.history.pushState({ page: newPage, params }, '', targetUrl);
+          }
+        } catch {
+          // Ignore History API security restrictions in sandboxed environments
+        }
+      }
+      if (!options.skipScroll) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
   };
+
+  // Sync browser Back / Forward buttons and hash deep-links
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncFromLocation = () => {
+      const matched = getCurrentRouteFromWindow();
+      setPage(matched.page);
+      setPageParams(matched.params);
+      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    };
+
+    window.addEventListener('popstate', syncFromLocation);
+    window.addEventListener('hashchange', syncFromLocation);
+    return () => {
+      window.removeEventListener('popstate', syncFromLocation);
+      window.removeEventListener('hashchange', syncFromLocation);
+    };
+  }, []);
+
+  // Hydrate comparison list if deep-linked via /compare?ids=id1,id2
+  useEffect(() => {
+    if (page === 'compare' && Array.isArray(pageParams?.ids) && pageParams.ids.length > 0) {
+      const matched = pageParams.ids
+        .map((id: string) => products.find((p) => p.id === id))
+        .filter((p): p is Product => Boolean(p))
+        .slice(0, 4);
+      if (matched.length > 0) {
+        setComparisonList(matched);
+      }
+    }
+  }, [page, pageParams?.ids, products]);
+
+  // Keep document.title synchronized with active deep-link route
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const brandSuffix = 'KINETIX Power';
+    let title = `${brandSuffix} | Premium Automotive, Solar & Lithium Batteries`;
+
+    switch (page) {
+      case 'shop':
+        title = pageParams?.category
+          ? `${String(pageParams.category).toUpperCase()} Batteries | ${brandSuffix}`
+          : `Shop Batteries | ${brandSuffix}`;
+        break;
+      case 'all-batteries':
+        title = `Browse All Batteries | ${brandSuffix}`;
+        break;
+      case 'car-batteries':
+        title = `Car Batteries | ${brandSuffix}`;
+        break;
+      case 'bike-batteries':
+        title = `Bike Batteries | ${brandSuffix}`;
+        break;
+      case 'inverter-batteries':
+        title = `Inverter Batteries | ${brandSuffix}`;
+        break;
+      case 'lithium-batteries':
+        title = `Lithium Batteries (LiFePO4) | ${brandSuffix}`;
+        break;
+      case 'solar-batteries':
+        title = `Solar Batteries | ${brandSuffix}`;
+        break;
+      case 'industrial-batteries':
+        title = `Industrial Batteries | ${brandSuffix}`;
+        break;
+      case 'ups-batteries':
+        title = `UPS Batteries | ${brandSuffix}`;
+        break;
+      case 'accessories':
+        title = `Battery Accessories | ${brandSuffix}`;
+        break;
+      case 'brands':
+        title = pageParams?.brand
+          ? `${String(pageParams.brand)} Batteries | ${brandSuffix}`
+          : `Authorized Battery Brands | ${brandSuffix}`;
+        break;
+      case 'offers':
+        title = `Special Offers & Battery Deals | ${brandSuffix}`;
+        break;
+      case 'category':
+        title = `${String(pageParams?.category || 'Battery').toUpperCase()} Category | ${brandSuffix}`;
+        break;
+      case 'product-detail': {
+        const prod = products.find((p) => p.id === pageParams?.productId);
+        title = prod ? `${prod.name} | ${brandSuffix}` : `Battery Details | ${brandSuffix}`;
+        break;
+      }
+      case 'compare':
+        title = `Compare Batteries | ${brandSuffix}`;
+        break;
+      case 'cart':
+        title = `Shopping Bag | ${brandSuffix}`;
+        break;
+      case 'checkout':
+        title = `Checkout | ${brandSuffix}`;
+        break;
+      case 'account':
+        title = `My Account | ${brandSuffix}`;
+        break;
+      case 'tracking':
+        title = pageParams?.orderId
+          ? `Track Order ${pageParams.orderId} | ${brandSuffix}`
+          : `Live Order Tracking | ${brandSuffix}`;
+        break;
+      case 'about':
+        title = `About Us | ${brandSuffix}`;
+        break;
+      case 'contact':
+        title = `Contact & 24/7 Support | ${brandSuffix}`;
+        break;
+      case 'blog':
+      case 'blog-detail':
+        title = `Engineering Publications | ${brandSuffix}`;
+        break;
+      case 'faq':
+        title = `FAQs | ${brandSuffix}`;
+        break;
+      case 'buying-guide':
+        title = `Battery Capacity Calculator | ${brandSuffix}`;
+        break;
+      case 'maintenance-guide':
+        title = `Battery Maintenance Guide | ${brandSuffix}`;
+        break;
+      case 'policy':
+        title = `Warranty & Policies | ${brandSuffix}`;
+        break;
+      case 'admin':
+        title = `Admin Console | ${brandSuffix}`;
+        break;
+      case 'not-found':
+        title = `Page Not Found | ${brandSuffix}`;
+        break;
+    }
+
+    document.title = title;
+  }, [page, pageParams, products]);
 
   // Cart calculations
   const cartSubtotal = cart.reduce(
-    (acc, item) => acc + item.product.price * item.quantity,
+    (acc, item) => acc + (item.unitPrice ?? item.product.price) * item.quantity,
     0
   );
   const cartItemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -437,19 +973,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const cartTotal = Math.max(0, cartSubtotal + cartTax - cartDiscount + cartShipping);
 
   // Cart operations
-  const addToCart = (product: Product, quantity: number = 1) => {
+  const addToCart = (
+    product: Product,
+    quantity: number = 1,
+    options?: {
+      finishName?: string;
+      finishFilter?: string;
+      capacityLabel?: string;
+      unitPrice?: number;
+    }
+  ) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
         return prev.map((item) =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? {
+                ...item,
+                quantity: item.quantity + quantity,
+                ...(options ? options : {}),
+              }
             : item
         );
       }
-      return [...prev, { product, quantity }];
+      return [...prev, { product, quantity, ...(options ? options : {}) }];
     });
-    showToast(`Added "${product.name}" to cart`);
+    const detailSuffix = options?.finishName ? ` (${options.finishName})` : '';
+    showToast(`Added "${product.name}"${detailSuffix} to bag`);
   };
 
   const updateCartQuantity = (productId: string, quantity: number) => {
@@ -498,18 +1048,68 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast('Coupon removed', 'info');
   };
 
-  // Wishlist operations
-  const toggleWishlist = (product: Product) => {
-    setWishlist((prev) => {
-      const exists = prev.some((p) => p.id === product.id);
-      if (exists) {
-        showToast(`Removed from Wishlist`, 'info');
-        return prev.filter((p) => p.id !== product.id);
-      } else {
-        showToast(`Saved to Wishlist`, 'success');
-        return [...prev, product];
-      }
+  // Wishlist operations (optimistic local state + Firestore persistence when signed in)
+  const persistWishlistToFirestore = (nextList: Product[]) => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const wishlistIds = nextList
+      .map((p) => p.id)
+      .filter((id) => typeof id === 'string' && id.length <= 128)
+      .slice(0, 50);
+    updateDoc(doc(db, 'users', uid), {
+      wishlistIds,
+      updatedAt: serverTimestamp(),
+    }).catch((error) => {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
     });
+  };
+
+  const toggleWishlist = (product: Product) => {
+    const exists = wishlist.some((p) => p.id === product.id);
+    if (!exists && wishlist.length >= 50) {
+      showToast('Wishlist limit reached (50 batteries max). Remove an item to save more.', 'error');
+      return;
+    }
+
+    const updated = exists
+      ? wishlist.filter((p) => p.id !== product.id)
+      : [product, ...wishlist];
+
+    setWishlist(updated);
+    showToast(
+      exists ? `Removed "${product.name}" from Wishlist` : `Saved "${product.name}" to Wishlist`,
+      exists ? 'info' : 'success'
+    );
+    persistWishlistToFirestore(updated);
+  };
+
+  const clearWishlist = () => {
+    if (wishlist.length === 0) return;
+    setWishlist([]);
+    showToast('Wishlist cleared', 'info');
+    persistWishlistToFirestore([]);
+  };
+
+  const moveAllWishlistToCart = () => {
+    if (wishlist.length === 0) return;
+    const itemsToMove = [...wishlist];
+    setCart((prev) => {
+      const next = [...prev];
+      itemsToMove.forEach((product) => {
+        const idx = next.findIndex((i) => i.product.id === product.id);
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
+        } else {
+          next.push({ product, quantity: 1 });
+        }
+      });
+      return next;
+    });
+    setWishlist([]);
+    persistWishlistToFirestore([]);
+    showToast(
+      `Moved ${itemsToMove.length} ${itemsToMove.length === 1 ? 'battery' : 'batteries'} to shopping cart`
+    );
   };
 
   const isInWishlist = (productId: string) => {
@@ -543,44 +1143,175 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return comparisonList.some((p) => p.id === productId);
   };
 
-  // User auth actions
-  const login = (email: string, role: 'customer' | 'admin' = 'customer') => {
-    const dummyUser: User = {
-      id: `usr_${Date.now()}`,
-      name: email.split('@')[0],
-      email,
-      phone: '+91 98210 55432',
-      role,
-      addresses: DEFAULT_USER.addresses,
+  // Firebase Auth actions
+  const signInWithGoogle = async (prefill?: { name?: string; phone?: string }): Promise<boolean> => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+      await ensureUserProfileDoc(fbUser, prefill);
+      setIsAuthModalOpen(false);
+      const displayName = prefill?.name?.trim() || fbUser.displayName || fbUser.email?.split('@')[0] || 'Customer';
+      showToast(`Welcome, ${displayName}! Your account is synced.`);
+      return true;
+    } catch (error: any) {
+      const code = error?.code || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        showToast('Sign-in popup was closed before completing.', 'info');
+      } else if (code === 'auth/popup-blocked') {
+        showToast('Browser blocked the sign-in popup. Please allow popups and try again.', 'error');
+      } else {
+        showToast(error?.message || 'Unable to sign in with Google. Please try again.', 'error');
+      }
+      return false;
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setFirestoreOrders([]);
+      showToast('Signed out successfully', 'info');
+    } catch (error: any) {
+      showToast(error?.message || 'Could not sign out right now.', 'error');
+    }
+  };
+
+  const updateUserProfile = async (updates: ProfileUpdateInput): Promise<void> => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) {
+      showToast('Please sign in to update your profile.', 'error');
+      return;
+    }
+    const uid = fbUser.uid;
+    const safeName = clampString(updates.name, 100, 'Customer');
+    const safePhone = clampString(updates.phone, 30, '');
+    const safeGender = (['', 'Male', 'Female', 'Other'].includes(updates.gender)
+      ? updates.gender
+      : '') as '' | 'Male' | 'Female' | 'Other';
+
+    try {
+      await ensureUserProfileDoc(fbUser);
+      await updateDoc(doc(db, 'users', uid), {
+        name: safeName,
+        phone: safePhone,
+        gender: safeGender,
+        updatedAt: serverTimestamp(),
+      });
+      showToast('Profile information updated & saved.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+    }
+  };
+
+  const saveAddress = async (input: AddressSaveInput): Promise<void> => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) {
+      showToast('Please sign in to save addresses.', 'error');
+      return;
+    }
+    const uid = fbUser.uid;
+    await ensureUserProfileDoc(fbUser);
+
+    const isEditing = Boolean(input.id && /^[a-zA-Z0-9_-]{1,128}$/.test(input.id));
+    const addressId = isEditing
+      ? input.id!
+      : `addr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+    const existingAddresses = user?.addresses || [];
+    const shouldBeDefault = Boolean(input.isDefault) || existingAddresses.length === 0;
+
+    const cleanLabel: 'Home' | 'Work' | 'Other' =
+      input.label && ['Home', 'Work', 'Other'].includes(input.label) ? input.label : 'Home';
+
+    const payload = {
+      label: cleanLabel,
+      fullName: clampString(input.fullName, 100, user?.name || 'Customer'),
+      phone: clampString(input.phone, 30, user?.phone || '0000000000').padEnd(6, '0'),
+      email: clampString(input.email || user?.email || fbUser.email || '', 200, ''),
+      addressLine1: clampString(input.addressLine1, 250, 'Street Address'),
+      addressLine2: clampString(input.addressLine2, 200, ''),
+      city: clampString(input.city, 80, 'Mumbai'),
+      state: clampString(input.state, 80, 'Maharashtra'),
+      pinCode: clampString(input.pinCode, 12, '400001'),
+      isDefault: shouldBeDefault,
     };
-    setUser(dummyUser);
-    setIsAuthModalOpen(false);
-    showToast(`Welcome back, ${dummyUser.name}! (${role === 'admin' ? 'Admin Access' : 'Verified'})`);
+
+    try {
+      const batch = writeBatch(db);
+
+      // If this address is becoming default, unset previous default addresses
+      if (shouldBeDefault) {
+        existingAddresses.forEach((addr) => {
+          if (addr.id && addr.id !== addressId && addr.isDefault) {
+            batch.update(doc(db, 'users', uid, 'addresses', addr.id), {
+              isDefault: false,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        });
+      }
+
+      const targetRef = doc(db, 'users', uid, 'addresses', addressId);
+      if (isEditing) {
+        batch.update(targetRef, {
+          ...payload,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        batch.set(targetRef, {
+          id: addressId,
+          userId: uid,
+          ...payload,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      showToast(isEditing ? 'Address updated successfully' : 'New delivery address saved');
+    } catch (error) {
+      handleFirestoreError(
+        error,
+        isEditing ? OperationType.UPDATE : OperationType.CREATE,
+        `users/${uid}/addresses/${addressId}`
+      );
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    showToast('Logged out successfully', 'info');
+  const deleteAddress = async (addressId: string): Promise<void> => {
+    const fbUser = auth.currentUser;
+    if (!fbUser || !addressId) return;
+    const uid = fbUser.uid;
+    try {
+      await deleteDoc(doc(db, 'users', uid, 'addresses', addressId));
+      showToast('Address deleted', 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${uid}/addresses/${addressId}`);
+    }
   };
 
-  const registerUser = (name: string, email: string, phone: string) => {
-    const newUser: User = {
-      id: `usr_${Date.now()}`,
-      name,
-      email,
-      phone,
-      role: 'customer',
-      addresses: [],
-    };
-    setUser(newUser);
-    setIsAuthModalOpen(false);
-    showToast(`Account created! Welcome to KINETIX Power, ${name}.`);
-  };
-
-  const updateSavedAddresses = (addresses: Address[]) => {
-    if (user) {
-      setUser({ ...user, addresses });
-      showToast('Delivery addresses updated');
+  const setDefaultAddress = async (addressId: string): Promise<void> => {
+    const fbUser = auth.currentUser;
+    if (!fbUser || !addressId) return;
+    const uid = fbUser.uid;
+    const existingAddresses = user?.addresses || [];
+    try {
+      const batch = writeBatch(db);
+      existingAddresses.forEach((addr) => {
+        if (!addr.id) return;
+        const shouldBeDefault = addr.id === addressId;
+        if (Boolean(addr.isDefault) !== shouldBeDefault) {
+          batch.update(doc(db, 'users', uid, 'addresses', addr.id), {
+            isDefault: shouldBeDefault,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      });
+      await batch.commit();
+      showToast('Default delivery address updated');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}/addresses/${addressId}`);
     }
   };
 
@@ -606,23 +1337,35 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return products.find((p) => p.id === productId);
   };
 
-  // Orders
-  const placeOrder = ({
+  // Orders: works for BOTH signed-in users (persisted to Firestore) and guests (saved locally, linkable anytime)
+  const placeOrder = async ({
     shippingAddress,
     paymentMethod,
+    deliverySpeed = 'express',
+    saveAddressToProfile = false,
   }: {
     shippingAddress: Address;
     paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery';
-  }): Order => {
-    const orderId = `KTX-${Math.floor(10000 + Math.random() * 90000)}`;
-    const newOrder: Order = {
-      id: orderId,
-      date: new Date().toISOString(),
-      items: cart.map((item) => ({
+    deliverySpeed?: 'express' | 'standard';
+    saveAddressToProfile?: boolean;
+  }): Promise<Order> => {
+    const orderId = `KTX-${Math.floor(100000 + Math.random() * 900000)}`;
+    const cleanAddress = sanitizeShippingAddress(shippingAddress);
+    const fbUser = auth.currentUser;
+
+    const cleanItems = stripUndefined(
+      cart.slice(0, 20).map((item) => ({
         product: item.product,
         quantity: item.quantity,
-        priceAtPurchase: item.product.price,
-      })),
+        priceAtPurchase: item.unitPrice ?? item.product.price,
+      }))
+    );
+
+    const newOrder: Order = {
+      id: orderId,
+      userId: fbUser?.uid,
+      date: new Date().toISOString(),
+      items: cleanItems,
       subtotal: cartSubtotal,
       tax: cartTax,
       discount: cartDiscount,
@@ -631,10 +1374,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       status: 'Order Placed',
       paymentMethod,
       paymentStatus: paymentMethod === 'Cash on Delivery' ? 'Pending COD' : 'Paid',
-      shippingAddress,
+      shippingAddress: cleanAddress,
       trackingNumber: `TRACK-${orderId}-${Math.floor(100 + Math.random() * 900)}`,
       carrier: 'KINETIX SuperFast Verified Logistics',
-      estimatedDelivery: 'Within 24-48 Hours',
+      estimatedDelivery:
+        deliverySpeed === 'express' ? 'Within 4 Hours (Express Fitment)' : 'Standard Next-Day Slot',
       statusHistory: [
         {
           status: 'Order Placed',
@@ -644,42 +1388,279 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ],
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
+    if (fbUser) {
+      await ensureUserProfileDoc(fbUser);
+      try {
+        await setDoc(doc(db, 'orders', orderId), {
+          id: newOrder.id,
+          userId: fbUser.uid,
+          date: newOrder.date,
+          items: newOrder.items,
+          subtotal: newOrder.subtotal,
+          tax: newOrder.tax,
+          discount: newOrder.discount,
+          shipping: newOrder.shipping,
+          total: newOrder.total,
+          status: newOrder.status,
+          paymentMethod: newOrder.paymentMethod,
+          paymentStatus: newOrder.paymentStatus,
+          shippingAddress: newOrder.shippingAddress,
+          trackingNumber: newOrder.trackingNumber,
+          carrier: newOrder.carrier,
+          estimatedDelivery: newOrder.estimatedDelivery,
+          statusHistory: newOrder.statusHistory,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // Optionally save shipping address to customer's address book
+        if (saveAddressToProfile && !shippingAddress.id) {
+          await saveAddress({
+            label: shippingAddress.label || 'Home',
+            fullName: cleanAddress.fullName,
+            phone: cleanAddress.phone,
+            email: cleanAddress.email,
+            addressLine1: cleanAddress.addressLine1,
+            addressLine2: cleanAddress.addressLine2,
+            city: cleanAddress.city,
+            state: cleanAddress.state,
+            pinCode: cleanAddress.pinCode,
+            isDefault: (user?.addresses.length || 0) === 0,
+          });
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `orders/${orderId}`);
+      }
+    } else {
+      // Guest checkout: persist locally so anyone can order & track without signing in
+      setGuestOrders((prev) => {
+        const next = [newOrder, ...prev];
+        saveGuestOrders(next);
+        return next;
+      });
+    }
+
     clearCart();
+    showToast(`Order ${orderId} confirmed!`);
     return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, status: OrderStatus, note?: string) => {
-    setOrders((prev) =>
-      prev.map((ord) => {
-        if (ord.id === orderId) {
-          return {
-            ...ord,
-            status,
-            statusHistory: [
-              ...ord.statusHistory,
+  // Link a guest order to the signed-in user's Firestore account
+  const linkGuestOrderToAccount = async (guestOrder: Order): Promise<boolean> => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) return false;
+
+    try {
+      await ensureUserProfileDoc(fbUser);
+      const cleanAddress = sanitizeShippingAddress(guestOrder.shippingAddress);
+      const cleanItems = stripUndefined(guestOrder.items.slice(0, 20));
+      const cleanHistory = stripUndefined(
+        guestOrder.statusHistory.length > 0
+          ? guestOrder.statusHistory.slice(0, 20)
+          : [
               {
-                status,
+                status: 'Order Placed' as OrderStatus,
                 timestamp: new Date().toLocaleString('en-IN', {
                   dateStyle: 'medium',
                   timeStyle: 'short',
                 }),
-                note: note || `Status updated to ${status}.`,
+                note: 'Guest order linked to verified customer account.',
               },
-            ],
-          };
-        }
-        return ord;
-      })
-    );
-    showToast(`Order ${orderId} updated to ${status}`);
+            ]
+      );
+
+      await setDoc(doc(db, 'orders', guestOrder.id), {
+        id: guestOrder.id,
+        userId: fbUser.uid,
+        date: guestOrder.date,
+        items: cleanItems,
+        subtotal: guestOrder.subtotal,
+        tax: guestOrder.tax,
+        discount: guestOrder.discount,
+        shipping: guestOrder.shipping,
+        total: guestOrder.total,
+        status: 'Order Placed',
+        paymentMethod: guestOrder.paymentMethod,
+        paymentStatus: guestOrder.paymentStatus,
+        shippingAddress: cleanAddress,
+        trackingNumber: guestOrder.trackingNumber,
+        carrier: guestOrder.carrier,
+        estimatedDelivery: guestOrder.estimatedDelivery,
+        statusHistory: cleanHistory,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Remove from local guest storage once persisted in Firestore
+      setGuestOrders((prev) => {
+        const next = prev.filter((o) => o.id !== guestOrder.id);
+        saveGuestOrders(next);
+        return next;
+      });
+      showToast(`Order ${guestOrder.id} linked to your account!`);
+      return true;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `orders/${guestOrder.id}`);
+      return false;
+    }
+  };
+
+  const cancelOrder = async (orderId: string, reason?: string): Promise<void> => {
+    const target = orders.find((o) => o.id === orderId);
+    if (!target) return;
+
+    const cancellableStatuses: OrderStatus[] = ['Order Placed', 'Processing', 'Quality Testing'];
+    if (!cancellableStatuses.includes(target.status)) {
+      showToast('This order is already dispatched and cannot be cancelled online.', 'error');
+      return;
+    }
+
+    const newHistory = [
+      ...target.statusHistory,
+      {
+        status: 'Cancelled' as OrderStatus,
+        timestamp: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        note: reason?.trim() || 'Cancelled by customer prior to dispatch.',
+      },
+    ].slice(0, 20);
+
+    if (auth.currentUser && target.userId === auth.currentUser.uid) {
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'Cancelled',
+          statusHistory: newHistory,
+          updatedAt: serverTimestamp(),
+        });
+        showToast(`Order ${orderId} has been cancelled.`, 'info');
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `orders/${orderId}`);
+      }
+    } else {
+      setGuestOrders((prev) => {
+        const next = prev.map((o) =>
+          o.id === orderId ? { ...o, status: 'Cancelled' as OrderStatus, statusHistory: newHistory } : o
+        );
+        saveGuestOrders(next);
+        return next;
+      });
+      showToast(`Order ${orderId} has been cancelled.`, 'info');
+    }
+  };
+
+  const requestOrderReturn = async (orderId: string, reason: string): Promise<void> => {
+    const target = orders.find((o) => o.id === orderId);
+    if (!target) {
+      showToast('Order not found.', 'error');
+      return;
+    }
+    const cleanReason = clampString(reason, 500, '');
+    if (cleanReason.length < 3) {
+      showToast('Please provide a brief reason (at least 3 characters).', 'error');
+      return;
+    }
+    if (target.status !== 'Delivered') {
+      showToast('Return & replacement requests can only be submitted for delivered orders.', 'error');
+      return;
+    }
+
+    const newHistory = [
+      ...target.statusHistory,
+      {
+        status: 'Return Requested' as OrderStatus,
+        timestamp: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        note: `Return / replacement requested: ${cleanReason}`,
+      },
+    ].slice(0, 20);
+
+    if (auth.currentUser && target.userId === auth.currentUser.uid) {
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'Return Requested',
+          returnReason: cleanReason,
+          statusHistory: newHistory,
+          updatedAt: serverTimestamp(),
+        });
+        showToast(`Return ticket initiated for Order ${orderId}. Our engineer will contact you.`);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `orders/${orderId}`);
+      }
+    } else {
+      setGuestOrders((prev) => {
+        const next = prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status: 'Return Requested' as OrderStatus,
+                returnReason: cleanReason,
+                statusHistory: newHistory,
+              }
+            : o
+        );
+        saveGuestOrders(next);
+        return next;
+      });
+      showToast(`Return ticket initiated for Order ${orderId}. Our engineer will contact you.`);
+    }
+  };
+
+  const updateOrderStatus = async (
+    orderId: string,
+    status: OrderStatus,
+    note?: string
+  ): Promise<void> => {
+    const target = orders.find((o) => o.id === orderId);
+    if (!target) return;
+
+    const newHistory = [
+      ...target.statusHistory,
+      {
+        status,
+        timestamp: new Date().toLocaleString('en-IN', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
+        note: note || `Status updated to ${status}.`,
+      },
+    ].slice(0, 20);
+
+    if (auth.currentUser && target.userId) {
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status,
+          statusHistory: newHistory,
+          paymentStatus: status === 'Cancelled' && target.paymentStatus === 'Paid' ? 'Refunded' : target.paymentStatus,
+          trackingNumber: target.trackingNumber,
+          updatedAt: serverTimestamp(),
+        });
+        showToast(`Order ${orderId} updated to ${status}`);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `orders/${orderId}`);
+      }
+    } else {
+      setGuestOrders((prev) => {
+        const next = prev.map((o) =>
+          o.id === orderId ? { ...o, status, statusHistory: newHistory } : o
+        );
+        saveGuestOrders(next);
+        return next;
+      });
+      showToast(`Order ${orderId} updated to ${status}`);
+    }
   };
 
   const getOrderById = (orderId: string) => {
-    return orders.find(
-      (o) =>
-        o.id.toLowerCase() === orderId.toLowerCase() ||
-        o.trackingNumber.toLowerCase() === orderId.toLowerCase()
+    const clean = orderId.trim().toLowerCase();
+    return (
+      orders.find(
+        (o) =>
+          o.id.toLowerCase() === clean ||
+          o.trackingNumber.toLowerCase() === clean
+      ) ||
+      SAMPLE_TRACKING_ORDERS.find(
+        (o) =>
+          o.id.toLowerCase() === clean ||
+          o.trackingNumber.toLowerCase() === clean
+      )
     );
   };
 
@@ -739,6 +1720,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         page,
         pageParams,
         navigate,
+        getRouteUrl: buildUrlFromRoute,
         products,
         addProduct,
         updateProduct,
@@ -764,6 +1746,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         removeCoupon,
         wishlist,
         toggleWishlist,
+        clearWishlist,
+        moveAllWishlistToCart,
         isInWishlist,
         comparisonList,
         addToComparison,
@@ -771,15 +1755,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearComparison,
         isInComparison,
         user,
-        login,
+        authLoading,
+        signInWithGoogle,
         logout,
-        registerUser,
-        updateSavedAddresses,
+        updateUserProfile,
+        saveAddress,
+        deleteAddress,
+        setDefaultAddress,
         isAuthModalOpen,
         setIsAuthModalOpen,
         orders,
         placeOrder,
+        cancelOrder,
+        requestOrderReturn,
         updateOrderStatus,
+        linkGuestOrderToAccount,
         getOrderById,
         quickViewProduct,
         setQuickViewProduct,

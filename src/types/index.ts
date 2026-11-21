@@ -51,6 +51,10 @@ export interface Product {
 export interface CartItem {
   product: Product;
   quantity: number;
+  finishName?: string;
+  finishFilter?: string;
+  capacityLabel?: string;
+  unitPrice?: number;
 }
 
 export interface Coupon {
@@ -63,6 +67,7 @@ export interface Coupon {
 
 export interface Address {
   id?: string;
+  label?: 'Home' | 'Work' | 'Other';
   fullName: string;
   phone: string;
   email: string;
@@ -81,10 +86,12 @@ export type OrderStatus =
   | 'Dispatched'
   | 'Out for Delivery'
   | 'Delivered'
-  | 'Cancelled';
+  | 'Cancelled'
+  | 'Return Requested';
 
 export interface Order {
   id: string;
+  userId?: string;
   date: string;
   items: {
     product: Product;
@@ -103,6 +110,7 @@ export interface Order {
   trackingNumber: string;
   carrier: string;
   estimatedDelivery: string;
+  returnReason?: string;
   statusHistory: {
     status: OrderStatus;
     timestamp: string;
@@ -115,6 +123,8 @@ export interface User {
   name: string;
   email: string;
   phone: string;
+  gender?: '' | 'Male' | 'Female' | 'Other';
+  photoURL?: string;
   role: 'customer' | 'admin';
   addresses: Address[];
 }
@@ -122,13 +132,19 @@ export interface User {
 export interface Review {
   id: string;
   productId: string;
+  userId?: string;
   author: string;
   rating: number;
   date: string;
+  createdAtMs: number;
   title: string;
   comment: string;
   verifiedPurchase: boolean;
   vehicleOrApplication?: string;
+  configuredVariant?: string;
+  helpfulUserIds: string[];
+  baseHelpfulCount?: number;
+  source: 'firestore' | 'baseline';
 }
 
 export interface BlogPost {

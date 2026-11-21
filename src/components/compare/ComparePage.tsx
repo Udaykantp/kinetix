@@ -53,8 +53,8 @@ export const ComparePage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-[#B7BCC2] bg-[#101214] border border-[#25282D] px-3 py-2 rounded-lg cursor-pointer">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <label className="flex items-center gap-2 text-xs text-[#B7BCC2] bg-[#101214] border border-[#25282D] px-3 py-2 min-h-[40px] rounded-lg cursor-pointer">
               <input
                 type="checkbox"
                 checked={highlightDifferences}
@@ -91,16 +91,26 @@ export const ComparePage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto bg-[#101214] border border-[#25282D] rounded-2xl">
-            <table className="w-full text-left border-collapse text-xs">
-              {/* Product Card Row */}
-              <thead>
-                <tr className="border-b border-[#25282D]">
-                  <th className="p-5 w-60 text-xs font-mono uppercase text-[#8E959E] align-bottom bg-[#17191C]/50">
-                    Product Details
-                  </th>
+          <div className="space-y-3">
+            {/* Mobile swipe hint */}
+            <div className="sm:hidden flex items-center justify-between text-xs text-[#8E959E] bg-[#101214] px-3.5 py-2 rounded-lg border border-[#25282D]">
+              <span className="flex items-center gap-1.5">
+                <ArrowRight className="w-3.5 h-3.5 text-[#D6B98C]" />
+                <span>Swipe table horizontally to compare all models</span>
+              </span>
+              <span className="font-mono text-[#D6B98C]">{comparisonList.length} Models</span>
+            </div>
+
+            <div className="overflow-x-auto bg-[#101214] border border-[#25282D] rounded-2xl shadow-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                {/* Product Card Row */}
+                <thead>
+                  <tr className="border-b border-[#25282D]">
+                    <th className="sticky left-0 z-20 p-3 sm:p-5 w-32 sm:w-56 text-[11px] sm:text-xs font-mono uppercase text-[#8E959E] align-bottom bg-[#101214] border-r border-[#25282D] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">
+                      Product Details
+                    </th>
                   {comparisonList.map((prod) => (
-                    <th key={prod.id} className="p-5 min-w-[240px] max-w-[280px] align-top">
+                    <th key={prod.id} className="p-3.5 sm:p-5 min-w-[195px] sm:min-w-[240px] max-w-[280px] align-top">
                       <div className="relative">
                         <button
                           onClick={() => removeFromComparison(prod.id)}
@@ -143,7 +153,7 @@ export const ComparePage: React.FC = () => {
 
                   {/* Empty Slot if < 4 */}
                   {comparisonList.length < 4 && (
-                    <th className="p-5 min-w-[220px] text-center border-l border-dashed border-[#25282D] align-middle">
+                    <th className="p-3.5 sm:p-5 min-w-[195px] sm:min-w-[220px] text-center border-l border-dashed border-[#25282D] align-middle">
                       <div className="p-6 border border-dashed border-[#343940] rounded-xl flex flex-col items-center justify-center gap-2">
                         <Plus className="w-5 h-5 text-[#D6B98C]" />
                         <span className="text-xs font-semibold text-[#F2F0EA]">
@@ -183,13 +193,13 @@ export const ComparePage: React.FC = () => {
                         highlightDifferences && isDiff ? 'bg-[#D6B98C]/5' : 'hover:bg-[#17191C]/40'
                       }`}
                     >
-                      <td className="py-3.5 px-5 font-mono text-[#8E959E] font-medium bg-[#17191C]/50">
+                      <td className="sticky left-0 z-10 py-3 sm:py-3.5 px-3 sm:px-5 font-mono text-[11px] sm:text-xs text-[#8E959E] font-medium bg-[#101214] border-r border-[#25282D] w-32 sm:w-56 shadow-[2px_0_5px_rgba(0,0,0,0.3)]">
                         {spec.label}
                       </td>
                       {comparisonList.map((prod) => (
                         <td
                           key={prod.id}
-                          className={`py-3.5 px-5 font-semibold ${
+                          className={`py-3 sm:py-3.5 px-3.5 sm:px-5 font-semibold ${
                             highlightDifferences && isDiff
                               ? 'text-[#D6B98C]'
                               : 'text-[#F2F0EA]'
@@ -198,15 +208,16 @@ export const ComparePage: React.FC = () => {
                           {spec.format(prod)}
                         </td>
                       ))}
-                      {comparisonList.length < 4 && <td className="py-3.5 px-5" />}
+                      {comparisonList.length < 4 && <td className="py-3 sm:py-3.5 px-3.5 sm:px-5" />}
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
+  </div>
   );
 };

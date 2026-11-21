@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   CheckCircle2,
@@ -13,9 +13,20 @@ import { useStore } from '../../context/StoreContext';
 import { OrderStatus } from '../../types';
 
 export const OrderTrackingPage: React.FC = () => {
-  const { getOrderById, orders, pageParams, showToast } = useStore();
+  const { getOrderById, orders, pageParams, showToast, navigate } = useStore();
   const [searchId, setSearchId] = useState(pageParams?.orderId || orders[0]?.id || 'KTX-89214');
   const [activeOrder, setActiveOrder] = useState(() => getOrderById(searchId) || orders[0]);
+
+  useEffect(() => {
+    const targetId = pageParams?.orderId || activeOrder?.id;
+    if (targetId) {
+      if (pageParams?.orderId) setSearchId(pageParams.orderId);
+      const found = getOrderById(targetId);
+      if (found) {
+        setActiveOrder(found);
+      }
+    }
+  }, [pageParams?.orderId, orders]);
 
   const handleTrackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +34,7 @@ export const OrderTrackingPage: React.FC = () => {
       const found = getOrderById(searchId.trim());
       if (found) {
         setActiveOrder(found);
+        navigate('tracking', { orderId: found.id }, { replace: true, skipScroll: true });
       } else {
         showToast('Order ID not found in tracking registry. Try KTX-89214 or KTX-94812.', 'error');
       }
@@ -69,7 +81,10 @@ export const OrderTrackingPage: React.FC = () => {
       case 'Out for Delivery':
         return 3;
       case 'Delivered':
+      case 'Return Requested':
         return 4;
+      case 'Cancelled':
+        return 0;
       default:
         return 1;
     }
@@ -92,7 +107,7 @@ export const OrderTrackingPage: React.FC = () => {
 
         {/* Search Bar */}
         <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-5 mb-8 shadow-xl">
-          <form onSubmit={handleTrackSubmit} className="flex gap-2">
+          <form onSubmit={handleTrackSubmit} className="flex flex-col sm:flex-row gap-2.5">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-[#8E959E] absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -100,30 +115,32 @@ export const OrderTrackingPage: React.FC = () => {
                 placeholder="Enter Order ID (e.g. KTX-89214, KTX-94812)..."
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}
-                className="w-full bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:border-[#D6B98C] font-mono"
+                className="w-full bg-[#17191C] border border-[#343940] text-xs text-[#F2F0EA] pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:border-[#D6B98C] font-mono min-h-[44px]"
               />
             </div>
             <button
               type="submit"
-              className="px-6 py-3 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-semibold text-xs rounded-lg transition-colors whitespace-nowrap"
+              className="min-h-[44px] px-6 py-3 bg-[#D6B98C] hover:bg-[#E3CDA7] text-[#17191C] font-bold text-xs rounded-lg transition-all whitespace-nowrap active:scale-95"
             >
               Track Order
             </button>
           </form>
 
           {/* Quick chip examples */}
-          <div className="flex items-center gap-2 mt-3 text-xs text-[#8E959E]">
-            <span>Recent Test Orders:</span>
-            {orders.slice(0, 3).map((o) => (
+          <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-[#8E959E]">
+            <span>{orders.length > 0 ? 'Your Orders:' : 'Sample Tracking IDs:'}</span>
+            {(orders.length > 0 ? orders.slice(0, 4).map((o) => o.id) : ['KTX-89214', 'KTX-94812']).map((oid) => (
               <button
-                key={o.id}
+                key={oid}
                 onClick={() => {
-                  setSearchId(o.id);
-                  setActiveOrder(o);
+                  const found = getOrderById(oid);
+                  setSearchId(oid);
+                  if (found) setActiveOrder(found);
+                  navigate('tracking', { orderId: oid }, { replace: true, skipScroll: true });
                 }}
                 className="font-mono text-[#D6B98C] hover:underline"
               >
-                {o.id}
+                {oid}
               </button>
             ))}
           </div>
@@ -134,9 +151,9 @@ export const OrderTrackingPage: React.FC = () => {
             {/* Top Order Overview Banner */}
             <div className="bg-[#101214] border border-[#25282D] rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
-                <div className="flex items-center gap-2 text-xs font-mono text-[#D6B98C]">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-mono text-[#D6B98C]">
                   <span>CARRIER: {activeOrder.carrier}</span>
-                  <span>·</span>
+                  <span aria-hidden="true">·</span>
                   <span>TRACKING: {activeOrder.trackingNumber}</span>
                 </div>
                 <h2 className="text-2xl font-bold text-[#F2F0EA] mt-1 font-mono">
@@ -148,7 +165,7 @@ export const OrderTrackingPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="bg-[#17191C] border border-[#343940] p-4 rounded-xl text-right">
+              <div className="bg-[#17191C] border border-[#343940] p-4 rounded-xl text-left md:text-right">
                 <div className="text-[10px] font-mono text-[#8E959E] uppercase">
                   Current Fulfillment Status
                 </div>
